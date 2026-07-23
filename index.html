@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>حساب المعدل التراكمي | جامعة البلقاء التطبيقية</title>
+    
+    <!-- تسريع جلب الملفات الخارجية (Preconnect & DNS-Prefetch) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+
+    <!-- favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon/favicon-16x16.png">
+    <link rel="icon" type="image/x-icon" href="favicon/favicon.ico">
+    <link rel="manifest" href="favicon/site.webmanifest">
+
+    <!-- خطوط جوجل -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <!-- مكتبة Chart.js للمنحنى البياني -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    
+    <!-- مكتبة أيقونات FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- مكتبة الاحتفالية (Canvas Confetti) -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+
+    <style>
+        /* =========================================
+           1. الإعدادات الأساسية والمتغيرات
+        ========================================= */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Tajawal', sans-serif;
+        }
+
+        :root {
+            --primary: #006838;
+            --primary-dark: #1a1a1a;
+            --secondary: #f3c300;
+            --bg-color: #f4f7f6;
+            --surface: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #64748b;
+            --danger: #da291c;
+            --border: #e2e8f0;
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* إخفاء أسهم الأرقام من حقول الإدخال */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        /* تحسين شريط التمرير (Custom Scrollbar) */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* =========================================
+           2. الهيكل والتخطيط الأساسي (Layout)
+        ========================================= */
+        body {
+            background: linear-gradient(135deg, rgba(0, 104, 56, 0.95) 0%, rgba(26, 26, 26, 0.95) 100%), url('https://upload.wikimedia.org/wikipedia/commons/8/87/Balqa_Applied_University_Logo.png') center/cover fixed;
+            height: 100vh; 
+            overflow: hidden; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .app-container {
+            background-color: transparent; 
+            width: 100%;
+            max-width: 1100px;
+            height: 90vh; 
+            border-radius: 24px;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1fr 1.5fr; 
+            border: none;       
+            transform: translateZ(0);
+            transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* =========================================
+           3. القسم الأيمن (نموذج الإدخال)
+        ========================================= */
+        .input-section {
+            background-color: var(--surface); 
+            padding: 2rem;
+            border-left: 1px solid var(--border);
+            height: 100%;
+            overflow-y: auto; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 1.5rem;
+        }
+
+        .header img { width: 55px; height: auto; }
+
+        .header h1 {
+            color: var(--primary);
+            font-size: 1.2rem;
+            font-weight: 800;
+            line-height: 1.3;
+        }
+
+        .header h1 span {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            color: var(--text-main);
+            margin-bottom: 1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title i { color: var(--secondary); text-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .form-group input {
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 1rem;
+            color: var(--text-main);
+            background: #fff;
+            transition: all 0.2s ease;
+            outline: none;
+            width: 100%;
+            text-align: center;
+        }
+
+        .form-group input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 104, 56, 0.1);
+        }
+
+        /* --- مخطط التخرج --- */
+        .planner-result {
+            background: rgba(0, 104, 56, 0.05);
+            border: 1px dashed var(--primary);
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            color: var(--primary);
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            transition: 0.3s;
+        }
+
+        /* --- مواد الفصل --- */
+        .course-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .course-card {
+            background: #ffffff;
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
+            margin-bottom: 10px;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            animation: slideIn 0.4s ease-out;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            /* الإضافات الجديدة للحركة: */
+            max-height: 250px; 
+            overflow: hidden;
+            opacity: 1;
+        }
+
+        /* 3. حركة الحذف: بدلاً من الاختفاء فجأة، يتقلص حجم الكرت ويسحب ما تحته بنعومة للأسفل */
+        .course-card.removing {
+            opacity: 0;
+            transform: scale(0.9) translateY(-10px);
+            max-height: 0; /* السحر هنا: تقليص الطول للصفر بنعومة */
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-bottom: 0;
+            border-width: 0;
+        }
+
+        .course-card:hover {
+            transform: scale(1.01);
+            border-color: #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .course-card.repeated {
+            border-color: var(--secondary);
+            background-color: rgba(243, 195, 0, 0.04);
+        }
+
+        .course-card.removing {
+            opacity: 0;
+            transform: scale(0.9) translateY(-10px);
+            max-height: 0; /* السحر هنا: تقليص الطول للصفر بنعومة */
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-bottom: 0;
+            border-width: 0;
+        }
+
+        .course-main {
+            display: flex;
+            flex-direction: row-reverse;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* --- أزرار وقوائم منسدلة --- */
+        .btn-icon {
+            background: rgba(218, 41, 28, 0.1);
+            color: var(--danger);
+            border: none;
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-icon:hover { background: var(--danger); color: white; }
+        .btn-icon:active { transform: scale(0.95); }
+
+        select {
+            flex: 1;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-color: #f8fafc;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: left 0.7rem center;
+            background-size: 1em;
+            padding: 8px;
+            padding-left: 2rem !important;
+            font-size: 0.95rem;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            height: 40px;
+        }
+
+        select:hover { border-color: var(--primary); }
+        select:focus {
+            border-color: var(--primary);
+            background-color: #fff;
+            box-shadow: 0 0 0 2px rgba(0, 104, 56, 0.1);
+        }
+
+        .course-options {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px dashed #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+        }
+
+        .checkbox-label {
+            font-size: 0.75rem; /* تم تصغير الخط هنا (كان 0.85) */
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px; /* تقليل المسافة بين المربع والنص قليلاً */
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        /* تصغير حجم مربع الصح نفسه قليلاً ليتناسب مع الخط الجديد */
+        .checkbox-label input { 
+            width: 14px; 
+            height: 14px; 
+            accent-color: var(--primary); 
+        }
+        
+        /* 4. حركة انزلاق خيار "مادة معادة" (Slide Down) */
+        .old-grade-wrapper { 
+            max-height: 0; /* البداية مخفية بارتفاع صفر */
+            opacity: 0; /* الشفافية صفر لتأثير أنعم */
+            overflow: hidden; /* إخفاء المحتوى الذي يتجاوز الارتفاع */
+            display: flex; /* يجب أن تبقى flex دائماً ليعمل الأنيميشن */
+            align-items: center; 
+            gap: 3px; 
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* تأثير انسيابي للدخول والخروج */
+            margin-top: 0;
+        }
+        
+        .old-grade-wrapper.show {
+            max-height: 60px; /* يتمدد لهذا الارتفاع عند تفعيله */
+            opacity: 1; /* يظهر بالكامل */
+            margin-top: 5px;
+        }
+
+        .old-grade-wrapper select { padding-left: 5px !important; background-image: none; }        /* --- شارة تأثير إعادة المادة --- */
+
+        .boost-badge {
+            font-size: 0.7rem; /* 1. تصغير حجم الخط */
+            color: #006838;
+            background: rgba(0, 104, 56, 0.1);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 700;
+            margin: 0 auto; /* 2. توسيط الشارة نفسها في المساحة الفارغة */
+            text-align: center; /* 3. توسيط النص بداخل الشارة */
+            display: none;
+            transition: all 0.3s ease;
+            line-height: 1.4; /* لضمان توسط النص عمودياً بشكل مريح */
+        }
+        .boost-badge.negative {
+            color: var(--danger);
+            background: rgba(218, 41, 28, 0.1);
+        }
+
+        .btn-add {
+            width: 100%;
+            padding: 12px;
+            background: transparent;
+            border: 2px dashed var(--border);
+            color: var(--text-muted);
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2rem;
+            gap: 8px;
+        }
+
+        .btn-add:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(0, 104, 56, 0.05);
+        }
+        .btn-add:active { transform: scale(0.98); }
+
+        /* =========================================
+           4. القسم الأيسر (عرض النتائج)
+        ========================================= */
+        .result-section {
+            background-color: var(--primary); 
+            padding: 2.5rem;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; 
+            height: 100%;
+            position: relative;
+        }
+
+        .result-section::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(to bottom right, rgba(0,0,0,0.1), rgba(0,0,0,0.4));
+            pointer-events: none;
+        }
+
+        .result-card, .history-container, .chart-wrapper, .stats-container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .result-card { text-align: center; margin-bottom: 1rem; }
+        
+        .result-title {
+            font-size: 1.15rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .gpa-value {
+            font-size: clamp(3.5rem, 6vw, 5.5rem);
+            font-weight: 800;
+            line-height: 1;
+            color: var(--secondary);
+            text-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            margin-bottom: 15px;
+        }
+
+        .stats-container { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; }
+
+        .stat-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .stat-badge i { color: var(--secondary); }
+
+        .history-container {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px 20px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            margin-bottom: 15px;
+            margin-top: 15px;
+        }
+
+        .history-title {
+            font-size: 0.95rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .history-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+
+        .history-grid input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1rem;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .history-grid input:focus {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: var(--secondary);
+        }
+        .history-grid input::placeholder { color: rgba(255, 255, 255, 0.5); font-size: 0.9rem; }
+
+        .chart-wrapper {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            flex-grow: 1; 
+            display: flex;
+            align-items: center;
+            min-height: 180px; 
+            transition: all 0.3s ease;
+        }
+        .chart-wrapper:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* =========================================
+           5. التأثيرات والحركات (Animations)
+        ========================================= */
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* تأثير الاهتزاز للإنذار (مخفف) */
+        @keyframes shake {
+            0%, 100% { transform: translate3d(0, 0, 0); }
+            10%, 30%, 50%, 70%, 90% { transform: translate3d(-3.5px, 0, 0); }
+            20%, 40%, 60%, 80% { transform: translate3d(3.5px, 0, 0); }
+        }
+        
+        .shake-animation {
+            animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both !important;
+        }
+
+        /* =========================================
+           6. التجاوب الشامل مع جميع الأجهزة (Responsive Design)
+        ========================================= */
+
+        html { overflow-x: hidden; }
+
+        @media (min-width: 1200px) {
+            .app-container { max-width: 1150px; }
+        }
+
+        @media (max-width: 1024px) {
+            body {
+                padding: 0;
+                height: auto;
+                min-height: 100vh;
+                overflow-x: hidden;
+                overflow-y: auto; 
+                align-items: flex-start;
+            }
+
+            .app-container {
+                display: flex; 
+                flex-direction: column;
+                width: 100%;
+                max-width: 100%;
+                height: auto;
+                min-height: 100vh;
+                border-radius: 0; 
+                margin: 0;
+                box-shadow: none;
+                transform: none; 
+            }
+
+            .input-section {
+                border-left: none;
+                border-bottom: 1px solid rgba(0,0,0,0.1); 
+                padding: 2.5rem 2rem;
+                height: auto;
+                overflow-y: visible; 
+            }
+
+            .result-section {
+                border-radius: 0;
+                padding: 3rem 2rem;
+                height: auto;
+                overflow-y: visible;
+            }
+
+            .chart-wrapper { min-height: 250px; }
+        }
+
+        @media (max-width: 768px) {
+            .input-section { padding: 2rem 1.5rem; }
+            .result-section { padding: 2rem 1.5rem; }
+            .gpa-value { font-size: clamp(4rem, 10vw, 5rem); } 
+            .grid-2 { grid-template-columns: 1fr; gap: 15px; }
+        }
+
+        @media (max-width: 600px) {
+            .input-section { padding: 1.5rem 1rem; }
+            .result-section { padding: 2rem 1rem; }
+            .header h1 { font-size: 1.05rem; }
+            .header img { width: 45px; }
+            .history-grid { grid-template-columns: 1fr; gap: 12px; }
+            .course-card { padding: 12px 10px; }
+            .course-main { 
+                display: grid;
+                grid-template-columns: 35px 1fr 1fr; 
+                gap: 8px;
+            }
+            .btn-icon { width: 35px; height: 35px; } 
+            select { 
+                font-size: 0.85rem;
+                padding: 0 5px 0 25px !important; 
+                height: 38px;
+            }
+            .course-options { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .old-grade-wrapper { width: 100%; justify-content: space-between; }
+            .old-grade-wrapper select { flex: 1; max-width: 65%; }
+            .gpa-value { font-size: 3.5rem; margin-bottom: 15px; }
+            .stats-container { gap: 10px; flex-direction: column; align-items: stretch; }
+            .stat-badge { font-size: 0.9rem; padding: 10px 12px; justify-content: center; }
+        }
+
+        @media (max-width: 380px) {
+            .header { gap: 10px; margin-bottom: 1.2rem; }
+            .header h1 { font-size: 0.92rem; }
+            .header h1 span { font-size: 0.75rem; }
+            .header img { width: 38px; }
+            .section-title { font-size: 0.9rem; }
+            .form-group input { padding: 9px 8px; font-size: 0.95rem; }
+            .gpa-value { font-size: 2.9rem; }
+            .result-title { font-size: 1rem; }
+            .btn-add { font-size: 0.9rem; padding: 10px; }
+            .history-container { padding: 12px 14px; }
+        }
+
+        @media (max-height: 480px) and (orientation: landscape) {
+            .input-section, .result-section { padding: 1.25rem 1.5rem; }
+            .header { margin-bottom: 1rem; }
+            .gpa-value { font-size: 2.75rem; margin-bottom: 8px; }
+            .chart-wrapper { min-height: 160px; }
+            .history-container { margin-top: 10px; margin-bottom: 10px; padding: 10px 15px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container" id="appContainer">
+        
+        <!-- لوحة الإدخال -->
+        <div class="input-section">
+            <div class="header">
+                <img src="https://www.bau.edu.jo/content/Logo/baulogo.png" alt="شعار البلقاء">
+                <h1>حساب المعدل التّراكمي<span>جامعة البلقاء التطبيقية</span></h1>
+            </div>
+
+            <!-- السجل الأكاديمي -->
+            <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <span><i class="fas fa-history"></i> السّجل الأكاديمي</span>
+                <button onclick="resetCalculator()" title="تفريغ جميع البيانات" aria-label="تفريغ البيانات" style="background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 1.1rem; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
+            
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>المعدل الحالي</label>
+                    <input type="text" inputmode="decimal" id="oldGpa" oninput="autoFormatGPA(event)">
+                </div>
+                <div class="form-group">
+                    <label>السّاعات المقطوعة</label>
+                    <input type="number" id="oldHours" min="0">
+                </div>
+            </div>
+
+            <!-- مخطط التخرج -->
+            <div class="section-title"><i class="fas fa-graduation-cap"></i> مخطط التخرج (أداة ذكية)</div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>إجمالي ساعات التّخصص</label>
+                    <input type="number" id="planTotal" min="1">
+                </div>
+                <div class="form-group">
+                    <label>المعدل المستهدف</label>
+                    <input type="text" inputmode="decimal" id="planTarget" oninput="autoFormatGPA(event)">
+                </div>
+            </div>
+            
+            <div class="planner-result" id="plannerResult">
+                أدخل السّاعات المستهدفة لمعرفة المعدل الفّصلي المطلوب للتخرج.
+            </div>
+
+            <!-- مواد الفصل الحالي -->
+            <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-book-open"></i> مواد الفصل الحالي
+                </div>
+                <div id="semesterHoursBadge" style="font-size: 0.85rem; color: var(--primary); background: rgba(0, 104, 56, 0.08); padding: 4px 12px; border-radius: 12px; font-weight: 700; border: 1px solid rgba(0, 104, 56, 0.2);">
+                    ساعات الفصل: 0
+                </div>
+            </div>
+            <div class="course-list" id="coursesContainer">
+                <!-- سيتم ملء هذا القسم عبر الجافاسكريبت -->
+            </div>
+            
+            <button class="btn-add" onclick="addCourse()"><i class="fas fa-plus"></i> إضافة مادة</button>
+        </div>
+
+        <!-- لوحة النتائج -->
+        <div class="result-section">
+            <div class="result-card">
+                <div class="result-title">المعدل التّراكمي الجديد</div>
+                <div class="gpa-value" id="resultGpa">0.00</div>
+                <div class="stats-container">
+                    <div class="stat-badge" id="semesterGpaBadge"><i class="fas fa-chart-pie"></i> الفصلي: 0.00</div>
+                    <div class="stat-badge" id="resultHours"><i class="fas fa-clock"></i> مجموع الساعات: 0</div>
+                </div>
+            </div>
+
+            <div class="history-container">
+                <div class="history-title">تتبع التطور (اختياري) - أدخل آخر معدلين تراكميين</div>
+                <div class="history-grid">
+                    <input type="text" inputmode="decimal" id="hist1" placeholder="المعدل الأقدم" oninput="autoFormatGPA(event)">
+                    <input type="text" inputmode="decimal" id="hist2" placeholder="المعدل الأحدث" oninput="autoFormatGPA(event)">
+                </div>
+            </div>
+
+            <div class="chart-wrapper">
+                <canvas id="gpaChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================
+       البرمجة والتفاعل (JavaScript)
+    ========================================= -->
+    <script>
+        // المتغيرات العامة وكائن تخزين الـ DOM
+        let gpaChartInstance = null;
+        let hasCelebrated = false; 
+        let isWarningState = false; 
+        const DOM = {}; 
+
+        // دالة التأخير (Debounce) لتقليل الضغط على المتصفح
+        function debounce(func, delay) {
+            let timeoutId;
+            return function (...args) {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => {
+                    func.apply(this, args);
+                }, delay);
+            };
+        }
+
+        // نسخة مؤجلة من دالة الحساب والحفظ
+        const debouncedCalculateAndSave = debounce(() => {
+            calculateGPA();
+            saveData();
+        }, 300);
+
+        // التنفيذ عند تحميل الصفحة
+        window.onload = () => {
+            // 1. تخزين عناصر الصفحة في الذاكرة لسرعة الوصول (DOM Caching)
+            DOM.oldGpa = document.getElementById('oldGpa');
+            DOM.oldHours = document.getElementById('oldHours');
+            DOM.planTotal = document.getElementById('planTotal');
+            DOM.planTarget = document.getElementById('planTarget');
+            DOM.hist1 = document.getElementById('hist1');
+            DOM.hist2 = document.getElementById('hist2');
+            DOM.coursesContainer = document.getElementById('coursesContainer');
+            DOM.resultGpa = document.getElementById('resultGpa');
+            DOM.semesterGpaBadge = document.getElementById('semesterGpaBadge');
+            DOM.resultHours = document.getElementById('resultHours');
+            DOM.semesterHoursBadge = document.getElementById('semesterHoursBadge');
+            DOM.plannerResult = document.getElementById('plannerResult');
+            DOM.appContainer = document.getElementById('appContainer');
+
+            // 2. تفويض الأحداث (Event Delegation) 
+            DOM.coursesContainer.addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.delete-btn');
+                if (deleteBtn) {
+                    removeCourse(deleteBtn);
+                }
+            });
+
+            DOM.coursesContainer.addEventListener('change', (e) => {
+                if (e.target.classList.contains('repeat-checkbox')) {
+                    toggleRepeat(e.target);
+                    debouncedCalculateAndSave(); 
+                }
+            });
+
+            DOM.appContainer.addEventListener('input', () => {
+                debouncedCalculateAndSave();
+            });
+
+            loadData();
+        };
+
+        // تفريغ وتصفير جميع البيانات
+        function resetCalculator() {
+            if (confirm("هل أنت متأكد من رغبتك في تفريغ جميع البيانات وحذف المواد الحالية؟")) {
+                localStorage.removeItem('bau_gpa_calculator_data');
+                
+                DOM.oldGpa.value = '';
+                DOM.oldHours.value = '';
+                DOM.planTotal.value = '';
+                DOM.planTarget.value = '';
+                if(DOM.hist1) DOM.hist1.value = '';
+                if(DOM.hist2) DOM.hist2.value = '';
+                
+                DOM.coursesContainer.innerHTML = '';
+                
+                addDefaultCourses();
+                
+                hasCelebrated = true; 
+                isWarningState = false; 
+                DOM.appContainer.classList.remove('shake-animation');
+                
+                calculateGPA();
+            }
+        }
+
+        // التنسيق التلقائي للمعدلات (إضافة النقطة العشرية تلقائياً)
+        function autoFormatGPA(event) {
+            if (event.inputType === 'deleteContentBackward') return;
+
+            let input = event.target;
+            let value = input.value.replace(/[^0-9]/g, ''); 
+
+            if (value.length > 0) {
+                let firstDigit = value.charAt(0);
+                if (parseInt(firstDigit) > 4) firstDigit = '4';
+
+                let decimals = value.substring(1, 3); 
+                if (firstDigit === '4' && decimals.length > 0) {
+                    decimals = decimals.replace(/[1-9]/g, '0'); 
+                }
+
+                if (value.length === 1) {
+                    input.value = firstDigit + '.';
+                } else {
+                    input.value = firstDigit + '.' + decimals;
+                }
+            } else {
+                input.value = '';
+            }
+        }
+
+        // تأثير العد التصاعدي للأرقام
+        function animateValue(obj, start, end, duration, isFloat = false, prefix = "") {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                
+                const easeOutProgress = 1 - Math.pow(1 - progress, 3); 
+                let currentVal = easeOutProgress * (end - start) + start;
+                
+                let displayVal = isFloat ? currentVal.toFixed(2) : Math.floor(currentVal);
+                obj.innerHTML = prefix + displayVal;
+                
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerHTML = prefix + (isFloat ? end.toFixed(2) : end);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // حفظ البيانات في المتصفح
+        function saveData() {
+            const data = {
+                oldGpa: DOM.oldGpa.value,
+                oldHours: DOM.oldHours.value,
+                planTotal: DOM.planTotal.value,
+                planTarget: DOM.planTarget.value,
+                hist1: DOM.hist1.value,
+                hist2: DOM.hist2.value,
+                courses: []
+            };
+
+            DOM.coursesContainer.querySelectorAll('.course-card').forEach(card => {
+                data.courses.push({
+                    hours: card.querySelector('.course-hours').value,
+                    grade: card.querySelector('.course-grade').value,
+                    isRepeated: card.querySelector('.repeat-checkbox').checked,
+                    oldGrade: card.querySelector('.old-grade').value
+                });
+            });
+
+            localStorage.setItem('bau_gpa_calculator_data', JSON.stringify(data));
+        }
+
+        // تحميل وتأمين البيانات المحفوظة (Data Validation & Whitelisting)
+        function loadData() {
+            try {
+                const savedDataRaw = localStorage.getItem('bau_gpa_calculator_data');
+                
+                if (!savedDataRaw) {
+                    addDefaultCourses();
+                    initChart(['المعدل الحالي', 'المعدل الجديد'], [0, 0], 0, 4);
+                    calculateGPA();
+                    return;
+                }
+
+                const savedData = JSON.parse(savedDataRaw);
+
+                // دوال مساعدة لفلترة المدخلات والتأكد من صحتها (Sanitization)
+                const isValidGPA = (val) => {
+                    if (!val) return true;
+                    const num = parseFloat(val);
+                    return !isNaN(num) && num >= 0 && num <= 4.00;
+                };
+
+                const isValidHours = (val) => {
+                    if (!val) return true;
+                    const num = parseInt(val);
+                    return !isNaN(num) && num >= 0;
+                };
+
+                // تطبيق القيم فقط إذا كانت صالحة هندسياً
+                DOM.oldGpa.value = isValidGPA(savedData.oldGpa) ? (savedData.oldGpa || '') : '';
+                DOM.oldHours.value = isValidHours(savedData.oldHours) ? (savedData.oldHours || '') : '';
+                DOM.planTotal.value = isValidHours(savedData.planTotal) ? (savedData.planTotal || '') : '';
+                DOM.planTarget.value = isValidGPA(savedData.planTarget) ? (savedData.planTarget || '') : '';
+                if(DOM.hist1) DOM.hist1.value = isValidGPA(savedData.hist1) ? (savedData.hist1 || '') : '';
+                if(DOM.hist2) DOM.hist2.value = isValidGPA(savedData.hist2) ? (savedData.hist2 || '') : '';
+
+                // فلترة المواد (Whitelisting Options)
+                if (savedData.courses && Array.isArray(savedData.courses) && savedData.courses.length > 0) {
+                    const validGrades = ["4.00", "3.75", "3.50", "3.25", "3.00", "2.75", "2.50", "2.25", "2.00", "1.25", "1.00", ""];
+                    const validOldGrades = ["2.25", "2.00", "1.25", "1.00"];
+                    const validCourseHours = ["1", "2", "3"];
+
+                    savedData.courses.forEach(course => {
+                        const safeCourse = {
+                            grade: validGrades.includes(course.grade) ? course.grade : "",
+                            hours: validCourseHours.includes(course.hours) ? course.hours : "3",
+                            isRepeated: !!course.isRepeated, // تحويل قسري لقيمة منطقية (Boolean)
+                            oldGrade: validOldGrades.includes(course.oldGrade) ? course.oldGrade : "1.00"
+                        };
+                        addCourseHTML(safeCourse);
+                    });
+                } else {
+                    addDefaultCourses();
+                }
+
+            } catch (error) {
+                // إذا تم العبث بملف الـ JSON وتدمر الهيكل، يتم إفراغه بصمت والبدء من جديد
+                console.warn("تم اكتشاف خطأ في البيانات المحفوظة. تم إعادة ضبط الحاسبة لحمايتك.");
+                localStorage.removeItem('bau_gpa_calculator_data');
+                addDefaultCourses();
+            }
+            
+            initChart(['المعدل الحالي', 'المعدل الجديد'], [0, 0], 0, 4);
+            calculateGPA();
+        }
+
+        // تبديل حالة خيار إعادة المادة (مع حركة الانزلاق)
+        function toggleRepeat(checkbox) {
+            const wrapper = checkbox.closest('.course-options').querySelector('.old-grade-wrapper');
+            const card = checkbox.closest('.course-card'); 
+            
+            if (checkbox.checked) {
+                wrapper.classList.add('show'); // يتمدد للأسفل
+                card.classList.add('repeated');
+            } else {
+                wrapper.classList.remove('show'); // يتقلص للأعلى
+                card.classList.remove('repeated');
+            }
+        }
+
+        // دالة إضافة الحد الأدنى من الساعات (12 ساعة = 4 مواد)
+        function addDefaultCourses() {
+            for (let i = 0; i < 4; i++) {
+                addCourseHTML();
+            }
+        }
+
+        // إضافة قالب HTML لمادة جديدة 
+        function addCourseHTML(course = null) {
+            const row = document.createElement('div');
+            row.className = 'course-card';
+            if (course && course.isRepeated) row.classList.add('repeated');
+            
+            let isChecked = course && course.isRepeated ? 'checked' : '';
+            // استبدلنا الستايل الثابت بكلاس ديناميكي
+            let wrapperClass = course && course.isRepeated ? 'old-grade-wrapper show' : 'old-grade-wrapper';    
+
+            row.innerHTML = `
+                <div class="course-main">
+                    <button type="button" class="btn-icon delete-btn" aria-label="حذف المادة"><i class="fas fa-trash"></i></button>
+                    <select class="course-grade" aria-label="اختر العلامة">
+                        <option value="" ${!course || course.grade === "" ? 'selected' : ''} disabled>اختر العلامة</option>
+                        <option value="4.00" ${course && course.grade === '4.00' ? 'selected' : ''}>A</option>
+                        <option value="3.75" ${course && course.grade === '3.75' ? 'selected' : ''}>A-</option>
+                        <option value="3.50" ${course && course.grade === '3.50' ? 'selected' : ''}>B+</option>
+                        <option value="3.25" ${course && course.grade === '3.25' ? 'selected' : ''}>(B)</option>
+                        <option value="3.00" ${course && course.grade === '3.00' ? 'selected' : ''}>(B-)</option>
+                        <option value="2.75" ${course && course.grade === '2.75' ? 'selected' : ''}>(C+)</option>
+                        <option value="2.50" ${course && course.grade === '2.50' ? 'selected' : ''}>(C)</option>
+                        <option value="2.25" ${course && course.grade === '2.25' ? 'selected' : ''}>(C-)</option>
+                        <option value="2.00" ${course && course.grade === '2.00' ? 'selected' : ''}>(D+)</option>
+                        <option value="1.25" ${course && course.grade === '1.25' ? 'selected' : ''}>(D)</option>
+                        <option value="1.00" ${course && course.grade === '1.00' ? 'selected' : ''}>(D-) (رسوب)</option>
+                    </select>
+                    <select class="course-hours" aria-label="اختر عدد الساعات">
+                        <option value="1" ${course && course.hours === '1' ? 'selected' : ''}>ساعة</option>
+                        <option value="2" ${course && course.hours === '2' ? 'selected' : ''}>ساعتان</option>
+                        <option value="3" ${!course || course.hours === '3' ? 'selected' : ''}>3 ساعات</option>
+                    </select>
+                </div>
+                <div class="course-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="repeat-checkbox" ${isChecked}> مادة معادة؟
+                    </label>
+                    <!-- تغيير style إلى class هنا -->
+                <div class="${wrapperClass}">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">العلامة السّابقة:</label>
+                        <select class="old-grade" aria-label="العلامة السابقة">
+                            <option value="2.25" ${course && course.oldGrade === '2.25' ? 'selected' : ''}>(C-)</option>
+                            <option value="2.00" ${course && course.oldGrade === '2.00' ? 'selected' : ''}>(D+)</option>
+                            <option value="1.25" ${course && course.oldGrade === '1.25' ? 'selected' : ''}>(D)</option>
+                            <option value="1.00" ${!course || course.oldGrade === '1.00' ? 'selected' : ''}>(D-) (رسوب)</option>
+                        </select>
+                    </div>
+                    <div class="boost-badge"></div>
+                </div>
+            `;
+            DOM.coursesContainer.appendChild(row);
+        }
+
+        // إضافة مادة
+        function addCourse() {
+            addCourseHTML();
+            calculateGPA();
+            saveData();
+        }
+
+        // حذف مادة
+        function removeCourse(button) {
+            const row = button.closest('.course-card');
+            if(DOM.coursesContainer.querySelectorAll('.course-card').length > 1) {
+                row.classList.add('removing');
+                setTimeout(() => {
+                    row.remove();
+                    debouncedCalculateAndSave(); 
+                }, 400);
+            }
+        }
+
+        // المعالج الرئيسي لحساب المعدل والتأثيرات
+        function calculateGPA() {
+            const oldGpa = parseFloat(DOM.oldGpa.value) || 0;
+            const oldHours = parseFloat(DOM.oldHours.value) || 0;
+            
+            let oldTotalPoints = oldGpa * oldHours;
+            let finalTotalHours = oldHours; 
+            
+            let newSemesterPoints = 0;
+            let newSemesterHours = 0; 
+            let registeredSemesterHours = 0; 
+
+            DOM.coursesContainer.querySelectorAll('.course-card').forEach(row => {
+                const hours = parseFloat(row.querySelector('.course-hours').value) || 0;
+                const isRepeated = row.querySelector('.repeat-checkbox').checked;
+                const gradeInput = row.querySelector('.course-grade').value;
+                
+                registeredSemesterHours += hours; 
+
+                if (gradeInput !== "" && !isRepeated) {
+                    finalTotalHours += hours;
+                }
+            });
+
+            DOM.coursesContainer.querySelectorAll('.course-card').forEach(row => {
+                const gradeInput = row.querySelector('.course-grade').value;
+                const boostBadge = row.querySelector('.boost-badge'); 
+                
+                if (gradeInput === "") {
+                    if(boostBadge) boostBadge.style.display = 'none';
+                    return; 
+                }
+
+                const hours = parseFloat(row.querySelector('.course-hours').value) || 0;
+                const gradeValue = parseFloat(gradeInput) || 0;
+                const isRepeated = row.querySelector('.repeat-checkbox').checked;
+                
+                newSemesterPoints += (hours * gradeValue);
+                newSemesterHours += hours; 
+
+                if (isRepeated) {
+                    const oldGradeValue = parseFloat(row.querySelector('.old-grade').value) || 0;
+                    oldTotalPoints -= (hours * oldGradeValue);
+                    
+                    if (finalTotalHours > 0 && boostBadge) {
+                        const pointDifference = (gradeValue * hours) - (oldGradeValue * hours);
+                        const boost = pointDifference / finalTotalHours;
+                        
+                        boostBadge.style.display = 'inline-block';
+                        if (boost > 0) {
+                            boostBadge.innerHTML = `<i class="fas fa-arrow-up"></i> رفع المعدل: +${boost.toFixed(3)}`;
+                            boostBadge.className = 'boost-badge';
+                        } else if (boost < 0) {
+                            boostBadge.innerHTML = `<i class="fas fa-arrow-down"></i> خسف المعدل: ${boost.toFixed(3)}`;
+                            boostBadge.className = 'boost-badge negative';
+                        } else {
+                            boostBadge.innerHTML = `<i class="fas fa-minus"></i> لا تأثير`;
+                            boostBadge.className = 'boost-badge';
+                        }
+                    }
+                } else {
+                    if(boostBadge) boostBadge.style.display = 'none';
+                }
+            });
+
+            let semesterGpa = 0;
+            if (newSemesterHours > 0) {
+                semesterGpa = newSemesterPoints / newSemesterHours;
+            }
+
+            const finalTotalPoints = oldTotalPoints + newSemesterPoints;
+            let finalGpa = 0;
+            if (finalTotalHours > 0) {
+                finalGpa = finalTotalPoints / finalTotalHours;
+            }
+
+            const currentGpa = parseFloat(DOM.resultGpa.innerText) || 0;
+            const currentSemGpa = parseFloat(DOM.semesterGpaBadge.innerText.replace(/[^0-9.]/g, '')) || 0;
+            const currentHours = parseInt(DOM.resultHours.innerText.replace(/[^0-9]/g, '')) || 0;
+            const currentRegHours = parseInt(DOM.semesterHoursBadge.innerText.replace(/[^0-9]/g, '')) || 0; 
+
+            animateValue(DOM.resultGpa, currentGpa, finalGpa, 800, true, "");
+            animateValue(DOM.semesterGpaBadge, currentSemGpa, semesterGpa, 800, true, `<i class="fas fa-chart-pie"></i> الفصلي: `);
+            animateValue(DOM.resultHours, currentHours, finalTotalHours, 800, false, `<i class="fas fa-clock"></i> مجموع السّاعات: `);
+            animateValue(DOM.semesterHoursBadge, currentRegHours, registeredSemesterHours, 800, false, `ساعات الفصل: `); 
+
+            calculatePlanner(finalGpa, finalTotalHours);
+
+            if (finalTotalHours > 0) {
+                if (finalGpa < 2.00) {
+                    if (!isWarningState) {
+                        DOM.appContainer.classList.remove('shake-animation');
+                        void DOM.appContainer.offsetWidth; 
+                        DOM.appContainer.classList.add('shake-animation');
+                        isWarningState = true;
+                    }
+                } else {
+                    DOM.appContainer.classList.remove('shake-animation');
+                    isWarningState = false;
+                }
+
+                if (finalGpa >= 3.00 && !hasCelebrated) {
+                    triggerConfetti();
+                    hasCelebrated = true;
+                } else if (finalGpa < 3.00) {
+                    hasCelebrated = false;
+                }
+            } else {
+                DOM.appContainer.classList.remove('shake-animation');
+                isWarningState = false;
+                hasCelebrated = false;
+            }
+
+            let chartLabels = [];
+            let chartData = [];
+
+            let h1 = parseFloat(DOM.hist1.value);
+            let h2 = parseFloat(DOM.hist2.value);
+
+            if(!isNaN(h1)) { chartLabels.push(`المعدل الأقدم`); chartData.push(h1); }
+            if(!isNaN(h2)) { chartLabels.push(`المعدل السّابق`); chartData.push(h2); }
+            
+            if(oldGpa > 0) {
+                chartLabels.push('المعدل الحالي');
+                chartData.push(oldGpa);
+            }
+
+            chartLabels.push('المعدل الجديد');
+            chartData.push(parseFloat(finalGpa.toFixed(2)));
+
+            let yMin = 0; let yMax = 4;
+            if(chartData.length > 0) {
+                let minData = Math.min(...chartData);
+                let maxData = Math.max(...chartData);
+                yMin = Math.max(0, minData - 0.15); 
+                yMax = Math.min(4, maxData + 0.15); 
+            }
+
+            initChart(chartLabels, chartData, yMin, yMax);
+        }
+
+        function triggerConfetti() {
+            var duration = 3 * 1000; 
+            var end = Date.now() + duration;
+
+            (function frame() {
+                confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#006838', '#f3c300', '#ffffff'] });
+                confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#006838', '#f3c300', '#ffffff'] });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+        }
+
+        function calculatePlanner(currentGpa, currentTotalHours) {
+            const planTotal = parseFloat(DOM.planTotal.value) || 0;
+            const planTarget = parseFloat(DOM.planTarget.value) || 0;
+
+            if(planTotal > 0 && planTarget > 0 && currentTotalHours > 0) {
+                const remainingHours = planTotal - currentTotalHours;
+                if(remainingHours <= 0) {
+                    DOM.plannerResult.innerText = "ألف مبروك! لقد أنهيت الساعات المعتمدة لخطة التّخصص 🎓";
+                    DOM.plannerResult.style.color = '#006838';
+                    DOM.plannerResult.style.borderColor = '#006838';
+                    return;
+                }
+                
+                const requiredPoints = (planTotal * planTarget) - (currentTotalHours * currentGpa);
+                const requiredGpa = requiredPoints / remainingHours;
+
+                if(requiredGpa > 4.00) {
+                    DOM.plannerResult.innerHTML = `المعدل المطلوب في الـ <b>${remainingHours}</b> ساعة المتبقية هو <b>${requiredGpa.toFixed(2)}</b> (مستحيل رياضياً بلوغ الهدف ❌)`;
+                    DOM.plannerResult.style.color = 'var(--danger)';
+                    DOM.plannerResult.style.borderColor = 'var(--danger)';
+                } else if (requiredGpa <= 0) {
+                    DOM.plannerResult.innerHTML = `المعدل المطلوب هو <b>0.00</b> (لقد ضمنت الهدف بالفعل ✅)`;
+                    DOM.plannerResult.style.color = '#006838';
+                    DOM.plannerResult.style.borderColor = '#006838';
+                } else {
+                    DOM.plannerResult.innerHTML = `تحتاج لمعدل <b>${requiredGpa.toFixed(2)}</b> في الـ <b>${remainingHours}</b> ساعة المتبقية للوصول لهدفك 🎯`;
+                    DOM.plannerResult.style.color = 'var(--primary)';
+                    DOM.plannerResult.style.borderColor = 'var(--primary)';
+                }
+            } else {
+                DOM.plannerResult.innerText = "أدخل ساعات الخطة والمعدل المستهدف لحساب خطة التخرج التلقائية.";
+                DOM.plannerResult.style.color = 'var(--primary)';
+                DOM.plannerResult.style.borderColor = 'var(--primary)';
+            }
+        }
+
+        function initChart(labelsArray, dataArray, yMin, yMax) {
+            const ctx = document.getElementById('gpaChart').getContext('2d');
+            
+            if (gpaChartInstance) {
+                gpaChartInstance.data.labels = labelsArray;
+                gpaChartInstance.data.datasets[0].data = dataArray;
+                gpaChartInstance.options.scales.y.min = yMin;
+                gpaChartInstance.options.scales.y.max = yMax;
+                gpaChartInstance.update();
+                return;
+            }
+
+            let gradient = ctx.createLinearGradient(0, 0, 0, 350);
+            gradient.addColorStop(0, 'rgba(243, 195, 0, 0.5)');
+            gradient.addColorStop(1, 'rgba(243, 195, 0, 0.0)');
+
+            gpaChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labelsArray,
+                    datasets: [{
+                        label: 'المعدل',
+                        data: dataArray,
+                        borderColor: '#f3c300',
+                        backgroundColor: gradient,
+                        borderWidth: 4,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#f3c300',
+                        pointBorderWidth: 3,
+                        pointRadius: 6,
+                        pointHoverRadius: 9,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, 
+                    animation: { duration: 800, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: function(context) { return ' المعدل: ' + context.parsed.y; } } }
+                    },
+                    scales: {
+                        y: {
+                            min: yMin, max: yMax, 
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.8)', font: { size: 14 } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: 'rgba(255, 255, 255, 0.9)', font: { family: 'Tajawal', size: 13 } }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
