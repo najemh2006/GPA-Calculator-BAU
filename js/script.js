@@ -1,4 +1,4 @@
-    'use strict';
+'use strict';
 
     const UNDO_TIMEOUT_MS = 5000;
     const SAVE_INDICATOR_REFRESH_MS = 10000;
@@ -8,19 +8,26 @@
     const GRADE_MAX = 4;
     const MAX_HOURS = 256;
     const MIN_PLAN_HOURS = 132;
+    const MAX_COURSES = 12; // أقصى عدد مواد منطقي في الفصل الواحد
+
+
 
     const AppState = {
         chartInstance: null,
         hasCelebrated: false,
         isWarningState: false,
         confettiPromise: null,
-        deletedCourseState: null,
+        undoAction: null, // دالة التراجع الحالية للتوست (حذف مادة أو ترحيل فصل)
+        gpaHistory: [], // سجل المعدلات التراكمية التلقائي: أقدم → الأحدث (حد أقصى 6)
         undoToastTimeout: null,
+        warnTimeout: null, // مؤقت إخفاء رسالة التحذير المؤقتة (5 ثوانٍ)
         undoInterval: null,
         lastSaveTime: null,
         timeUpdateInterval: null,
         lastChartDataString: "",
         currentTimestamp: null,
+        // آخر نتائج محسوبة فعلياً (تُستخدم في الترحيل بدل قراءة الأرقام أثناء أنيميشنها)
+        lastComputed: { gpa: 0, hours: 0, semHours: 0 },
         animFrames: new WeakMap() // يمنع تراكب أكثر من حركة على نفس العنصر
     };
 
@@ -48,6 +55,21 @@
         DOM.saveStatusText = document.getElementById('saveStatusText');
         DOM.undoTimerText = document.getElementById('undoTimerText');
         DOM.circlePath = document.getElementById('circlePath');
+        // نص رسالة التراجع (span النص داخل التوست — ليس عدّاد الثواني)
+        DOM.undoToastMsg = Array.from(DOM.undoToast.querySelectorAll('span')).find(s => s.id !== 'undoTimerText');
+
+        // صندوق الإدخال اليدوي للتتبع (يظهر دائماً الآن بعد إلغاء نظام الشارات)
+        DOM.historyContainer = document.querySelector('.history-container');
+
+        // بانر التحذير المبكر — أعلى القسم الأيسر مباشرة
+        DOM.warnBanner = document.createElement('div');
+        DOM.warnBanner.style.cssText = 'display:none;background:rgba(218,41,28,0.88);color:#fff;font-size:0.85rem;font-weight:700;text-align:center;padding:8px 12px;border-radius:10px;margin-bottom:12px;position:relative;z-index:1;';
+        const resultSectionEl = document.querySelector('.result-section');
+        if (resultSectionEl) resultSectionEl.insertBefore(DOM.warnBanner, resultSectionEl.firstChild);
+
+
+        // منع تشغيل أنيميشن الملاحظة عند أول تحميل للصفحة
+        NoteAnim.key = 'idle';
     }
 
     function debounce(func, delay) {
@@ -56,6 +78,13 @@
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => { func.apply(this, args); }, delay);
         };
+    }
+
+    // إعادة تشغيل أنيميشن CSS على عنصر (بإزالة الكلاس وإعادة إضافته بعد reflow)
+    function retriggerAnimation(el, className) {
+        el.classList.remove(className);
+        void el.offsetWidth;
+        el.classList.add(className);
     }
 
     const debouncedCalculateAndSave = debounce(() => { calculateGPA(true); }, CALC_DEBOUNCE_MS);
@@ -71,9 +100,56 @@
                 toggleRepeat(e.target);
                 debouncedCalculateAndSave();
             }
+
+            // تغيير قائمة العلامات عند اختيار 0 ساعة
+            if (e.target.classList.contains('course-hours')) {
+                const courseCard = e.target.closest('.course-card');
+                const gradeSelect = courseCard.querySelector('.course-grade');
+                const repeatLabel = courseCard.querySelector('.checkbox-label');
+                const repeatCheckbox = courseCard.querySelector('.repeat-checkbox');
+                const isZeroHours = e.target.value === "0";
+
+                if (isZeroHours) {
+                    gradeSelect.innerHTML = `
+                        <option value="" selected disabled>اختر النتيجة</option>
+                        <option value="pass">ناجح</option>
+                        <option value="fail">راسب</option>
+                    `;
+                    // إخفاء خيار "مادة معادة؟" لأنه لا معنى له مع مادة بصفر ساعة
+                    if (repeatLabel) repeatLabel.style.display = 'none';
+                    if (repeatCheckbox && repeatCheckbox.checked) {
+                        repeatCheckbox.checked = false;
+                        toggleRepeat(repeatCheckbox);
+                    }
+                } else {
+                    gradeSelect.innerHTML = `
+                        <option value="" selected disabled>اختر العلامة</option>
+                        <option value="pass">ناجح (لا تُحتسب بالمعدل)</option>
+                        <option value="4.00">A</option>
+                        <option value="3.75">-A</option>
+                        <option value="3.50">+B</option>
+                        <option value="3.25">(B)</option>
+                        <option value="3.00">(-B)</option>
+                        <option value="2.75">(+C)</option>
+                        <option value="2.50">(C)</option>
+                        <option value="2.25">(-C)</option>
+                        <option value="2.00">(+D)</option>
+                        <option value="1.25">(D)</option>
+                        <option value="1.00">(رسوب) (-D)</option>
+                    `;
+                    // إعادة إظهار الخيار عند تغيير عدد الساعات لأكثر من صفر
+                    if (repeatLabel) repeatLabel.style.display = '';
+                }
+
+                // نبضة خفيفة على قائمة العلامات عند إعادة بناء خياراتها
+                retriggerAnimation(gradeSelect, 'select-pulse');
+
+                debouncedCalculateAndSave();
+            }
         });
 
         DOM.appContainer.addEventListener('input', () => { debouncedCalculateAndSave(); });
+
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -89,6 +165,14 @@
     // 2. إدارة التخزين المحلي ومؤشر الحفظ الذكي
     // ==========================================
 
+    // صيغة الجمع العربية الصحيحة: 1 دقيقة، دقيقتان، 3-10 دقائق، 11+ دقيقة
+    function pluralize(count, one, two, few, many) {
+        if (count === 1) return one;
+        if (count === 2) return two;
+        if (count >= 3 && count <= 10) return few;
+        return many;
+    }
+
     function updateSaveIndicator() {
         if (!AppState.lastSaveTime || !DOM.saveStatusText) return;
         const now = new Date();
@@ -100,11 +184,13 @@
             DOM.saveStatusText.innerText = 'تم الحفظ: قبل ثوانٍ';
         } else if (diffSec < 3600) {
             const mins = Math.floor(diffSec / 60);
-            DOM.saveStatusText.innerText = `تم الحفظ: منذ ${mins} ${mins <= 10 && mins >= 3 ? 'دقائق' : 'دقيقة'}`;
+            DOM.saveStatusText.innerText = `تم الحفظ: منذ ${mins} ${pluralize(mins, 'دقيقة', 'دقيقتين', 'دقائق', 'دقيقة')}`;
         } else if (diffSec < 86400) {
-            DOM.saveStatusText.innerText = `تم الحفظ: منذ ${Math.floor(diffSec / 3600)} ساعة`;
+            const hrs = Math.floor(diffSec / 3600);
+            DOM.saveStatusText.innerText = `تم الحفظ: منذ ${hrs} ${pluralize(hrs, 'ساعة', 'ساعتين', 'ساعات', 'ساعة')}`;
         } else {
-            DOM.saveStatusText.innerText = `تم الحفظ: منذ ${Math.floor(diffSec / 86400)} يوم`;
+            const days = Math.floor(diffSec / 86400);
+            DOM.saveStatusText.innerText = `تم الحفظ: منذ ${days} ${pluralize(days, 'يوم', 'يومين', 'أيام', 'يوم')}`;
         }
     }
 
@@ -148,6 +234,11 @@
             }
             updateSaveIndicator();
 
+            // استرجاع سجل التطور التلقائي المحفوظ (مع تنقية القيم غير الصالحة)
+            AppState.gpaHistory = Array.isArray(savedData.gpaHistory)
+                ? savedData.gpaHistory.map(v => parseFloat(v)).filter(v => !isNaN(v) && v >= GRADE_MIN && v <= GRADE_MAX)
+                : [];
+
             const isValidGPA = (val) => val === '' || (!isNaN(parseFloat(val)) && parseFloat(val) >= GRADE_MIN && parseFloat(val) <= GRADE_MAX);
             const isValidHours = (val) => val === '' || (!isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 0);
 
@@ -187,7 +278,7 @@
             const chartScript = document.querySelector('script[src*="chart.js"]');
             if (chartScript) {
                 chartScript.addEventListener('load', () => {
-                    calculateGPA(false); 
+                    calculateGPA(false);
                 });
             }
         }
@@ -196,6 +287,7 @@
     function resetCalculator() {
         if (confirm("هل أنت متأكد من رغبتك في تفريغ جميع البيانات وحذف المواد الحالية؟")) {
             localStorage.removeItem(STORAGE_KEY);
+            AppState.gpaHistory = [];
             DOM.oldGpa.value = ''; DOM.oldHours.value = ''; DOM.planTotal.value = ''; DOM.planTarget.value = '';
             DOM.hist1.value = ''; DOM.hist2.value = ''; DOM.coursesContainer.innerHTML = '';
             addDefaultCourses();
@@ -208,29 +300,80 @@
     }
 
     function moveToNextSemester() {
-        const newGpa = DOM.resultGpa.innerText;
-        const newHours = parseInt(DOM.resultHours.innerText.replace(/[^0-9]/g, ''), 10) || 0;
-        const currentOldGpa = DOM.oldGpa.value;
-        const currentHist2 = DOM.hist2.value;
+        // نستخدم النتائج المحسوبة فعلياً بدلاً من قراءة الشاشة أثناء أنيميشن الأرقام
+        const computed = AppState.lastComputed;
 
-        if (parseFloat(newGpa) === 0 || isNaN(parseFloat(newGpa))) {
+        if (!computed || computed.semHours === 0) {
             alert("يرجى إدخال مواد وعلامات للفصل الحالي قبل الترحيل.");
             return;
         }
 
-        if (confirm("هل تريد ترحيل هذا المعدل ليكون معدلك الحالي، والبدء بفصل جديد؟ \n(سيتم ترحيل معدلاتك السابقة في تتبع التطور تلقائياً)")) {
-            if (currentHist2 !== "") DOM.hist1.value = currentHist2;
-            if (currentOldGpa !== "") DOM.hist2.value = currentOldGpa;
+        // منع الترحيل المزدوج: إذا كانت النتيجة المحسوبة مطابقة لما هو مسجل حالياً
+        // (أي لا مواد جديدة أُدخلت منذ آخر ترحيل) فلا داعي للترحيل وإتلاف السجل
+        const currentOldGpa = parseFloat(DOM.oldGpa.value) || 0;
+        const currentOldHours = parseInt(DOM.oldHours.value, 10) || 0;
+        if (Math.abs(computed.gpa - currentOldGpa) < 0.005 && computed.hours === currentOldHours) {
+            alert("لا توجد نتائج جديدة للترحيل — أدخل مواد الفصل الحالي أولاً.");
+            return;
+        }
+
+        const newGpa = computed.gpa.toFixed(2);
+        const newHours = computed.hours;
+        const currentHist2 = DOM.hist2.value;
+
+        if (confirm("هل تريد ترحيل هذا المعدل ليكون معدلك الحالي، والبدء بفصل جديد؟ \n(سيتم حفظ معدلك الحالي في سجل التطور تلقائياً، ويمكنك التراجع خلال 5 ثوانٍ)")) {
+            // لقطة كاملة للحالة الحالية تتيح التراجع عن الترحيل
+            const prevGpaVal = DOM.oldGpa.value;
+            const snapshot = {
+                oldGpa: prevGpaVal,
+                oldHours: DOM.oldHours.value,
+                hist1: DOM.hist1.value,
+                hist2: DOM.hist2.value,
+                gpaHistory: [...AppState.gpaHistory],
+                hasCelebrated: AppState.hasCelebrated,
+                courses: Array.from(DOM.coursesContainer.querySelectorAll('.course-card')).map(row => ({
+                    hours: row.querySelector('.course-hours').value,
+                    grade: row.querySelector('.course-grade').value,
+                    isRepeated: row.querySelector('.repeat-checkbox').checked,
+                    oldGrade: row.querySelector('.old-grade').value
+                }))
+            };
+
+            // (11) حفظ المعدل التراكمي الحالي في سجل التطور التلقائي (حد أقصى 6 فصول)
+            const prevGpaNum = parseFloat(prevGpaVal);
+            if (!isNaN(prevGpaNum) && prevGpaNum > 0) {
+                AppState.gpaHistory.push(prevGpaNum);
+                if (AppState.gpaHistory.length > 6) AppState.gpaHistory.shift();
+            }
+
+            if (prevGpaVal !== "" && prevGpaVal !== DOM.hist2.value) DOM.hist2.value = prevGpaVal;
+            if (currentHist2 !== "" && currentHist2 !== DOM.hist1.value) DOM.hist1.value = currentHist2;
 
             DOM.oldGpa.value = newGpa;
             DOM.oldHours.value = newHours;
             DOM.coursesContainer.innerHTML = '';
             addDefaultCourses();
-            AppState.hasCelebrated = false;
+            // منع انفجار القصاصات مباشرة بعد الترحيل إذا كان المعدل مرتفعاً أصلاً
+            AppState.hasCelebrated = computed.gpa >= 3.00;
             AppState.isWarningState = false;
             DOM.appContainer.classList.remove('shake-animation');
             calculateGPA(true);
-            hideUndoToast();
+
+            // (8) توست تراجع يعيد كل شيء كما كان قبل الترحيل
+            showUndoToast('تم ترحيل الفصل', () => {
+                DOM.oldGpa.value = snapshot.oldGpa;
+                DOM.oldHours.value = snapshot.oldHours;
+                DOM.hist1.value = snapshot.hist1;
+                DOM.hist2.value = snapshot.hist2;
+                AppState.gpaHistory = [...snapshot.gpaHistory];
+                AppState.hasCelebrated = snapshot.hasCelebrated;
+                DOM.coursesContainer.innerHTML = '';
+                const fragment = document.createDocumentFragment();
+                snapshot.courses.forEach(c => fragment.appendChild(createCourseElement(c)));
+                DOM.coursesContainer.appendChild(fragment);
+                updateCourseNumbers();
+                calculateGPA(true);
+            });
         }
     }
 
@@ -297,15 +440,46 @@
     function createCourseElement(course = null) {
         const row = document.createElement('div');
         row.className = 'course-card';
-        if (course && course.isRepeated) row.classList.add('repeated');
 
-        let isChecked = course && course.isRepeated ? 'checked' : '';
-        let wrapperClass = course && course.isRepeated ? 'old-grade-wrapper show' : 'old-grade-wrapper';
+        const isZeroHours = course && course.hours === '0';
+
+        if (course && course.isRepeated && !isZeroHours) row.classList.add('repeated');
+
+        let isChecked = (course && course.isRepeated && !isZeroHours) ? 'checked' : '';
+        let wrapperClass = (course && course.isRepeated && !isZeroHours) ? 'old-grade-wrapper show' : 'old-grade-wrapper';
+        let repeatLabelStyle = isZeroHours ? ' style="display:none;"' : '';
+
+        let gradeOptions = "";
+
+        if (isZeroHours) {
+            gradeOptions = `
+                <option value="" ${!course || course.grade === "" ? 'selected' : ''} disabled>اختر النتيجة</option>
+                <option value="pass" ${course && course.grade === 'pass' ? 'selected' : ''}>ناجح</option>
+                <option value="fail" ${course && course.grade === 'fail' ? 'selected' : ''}>راسب</option>
+            `;
+        } else {
+            gradeOptions = `
+                <option value="" ${!course || course.grade === "" ? 'selected' : ''} disabled>اختر العلامة</option>
+                <option value="pass" ${course && course.grade === 'pass' ? 'selected' : ''}>ناجح (لا تُحتسب بالمعدل)</option>
+                <option value="4.00" ${course && course.grade === '4.00' ? 'selected' : ''}>A</option>
+                <option value="3.75" ${course && course.grade === '3.75' ? 'selected' : ''}>-A</option>
+                <option value="3.50" ${course && course.grade === '3.50' ? 'selected' : ''}>+B</option>
+                <option value="3.25" ${course && course.grade === '3.25' ? 'selected' : ''}>(B)</option>
+                <option value="3.00" ${course && course.grade === '3.00' ? 'selected' : ''}>(-B)</option>
+                <option value="2.75" ${course && course.grade === '2.75' ? 'selected' : ''}>(+C)</option>
+                <option value="2.50" ${course && course.grade === '2.50' ? 'selected' : ''}>(C)</option>
+                <option value="2.25" ${course && course.grade === '2.25' ? 'selected' : ''}>(-C)</option>
+                <option value="2.00" ${course && course.grade === '2.00' ? 'selected' : ''}>(+D)</option>
+                <option value="1.25" ${course && course.grade === '1.25' ? 'selected' : ''}>(D)</option>
+                <option value="1.00" ${course && course.grade === '1.00' ? 'selected' : ''}>(رسوب) (-D)</option>
+            `;
+        }
 
         row.innerHTML = `
             <div class="course-main">
                 <span class="course-number course-number-box"></span>
                 <select class="course-hours" aria-label="اختر عدد الساعات">
+                    <option value="0" ${course && course.hours === '0' ? 'selected' : ''}>0 ساعة</option>
                     <option value="1" ${course && course.hours === '1' ? 'selected' : ''}>ساعة</option>
                     <option value="2" ${course && course.hours === '2' ? 'selected' : ''}>ساعتان</option>
                     <option value="3" ${!course || course.hours === '3' ? 'selected' : ''}>3 ساعات</option>
@@ -314,30 +488,19 @@
                     <option value="6" ${course && course.hours === '6' ? 'selected' : ''}>6 ساعات</option>
                 </select>
                 <select class="course-grade" aria-label="اختر العلامة">
-                    <option value="" ${!course || course.grade === "" ? 'selected' : ''} disabled>اختر العلامة</option>
-                    <option value="4.00" ${course && course.grade === '4.00' ? 'selected' : ''}>A</option>
-                    <option value="3.75" ${course && course.grade === '3.75' ? 'selected' : ''}>A-</option>
-                    <option value="3.50" ${course && course.grade === '3.50' ? 'selected' : ''}>B+</option>
-                    <option value="3.25" ${course && course.grade === '3.25' ? 'selected' : ''}>(B)</option>
-                    <option value="3.00" ${course && course.grade === '3.00' ? 'selected' : ''}>(B-)</option>
-                    <option value="2.75" ${course && course.grade === '2.75' ? 'selected' : ''}>(C+)</option>
-                    <option value="2.50" ${course && course.grade === '2.50' ? 'selected' : ''}>(C)</option>
-                    <option value="2.25" ${course && course.grade === '2.25' ? 'selected' : ''}>(C-)</option>
-                    <option value="2.00" ${course && course.grade === '2.00' ? 'selected' : ''}>(D+)</option>
-                    <option value="1.25" ${course && course.grade === '1.25' ? 'selected' : ''}>(D)</option>
-                    <option value="1.00" ${course && course.grade === '1.00' ? 'selected' : ''}>(D-) (رسوب)</option>
+                    ${gradeOptions}
                 </select>
                 <button type="button" class="btn-icon delete-btn" aria-label="حذف المادة"><svg class="icon"><use href="#icon-trash"/></svg></button>
             </div>
             <div class="course-options">
-                <label class="checkbox-label"><input type="checkbox" class="repeat-checkbox" ${isChecked}> مادة معادة؟</label>
+                <label class="checkbox-label"${repeatLabelStyle}><input type="checkbox" class="repeat-checkbox" ${isChecked}> مادة معادة؟</label>
                 <div class="${wrapperClass}">
                     <label style="font-size: 0.7rem; color: var(--text-muted);">العلامة السّابقة:</label>
                     <select class="old-grade" aria-label="العلامة السابقة">
-                        <option value="2.25" ${course && course.oldGrade === '2.25' ? 'selected' : ''}>(C-)</option>
-                        <option value="2.00" ${course && course.oldGrade === '2.00' ? 'selected' : ''}>(D+)</option>
+                        <option value="2.25" ${course && course.oldGrade === '2.25' ? 'selected' : ''}>(-C)</option>
+                        <option value="2.00" ${course && course.oldGrade === '2.00' ? 'selected' : ''}>(+D)</option>
                         <option value="1.25" ${course && course.oldGrade === '1.25' ? 'selected' : ''}>(D)</option>
-                        <option value="1.00" ${!course || course.oldGrade === '1.00' ? 'selected' : ''}>(D-) (رسوب)</option>
+                        <option value="1.00" ${!course || course.oldGrade === '1.00' ? 'selected' : ''}>(رسوب) (-D)</option>
                     </select>
                 </div>
             </div>
@@ -346,6 +509,12 @@
     }
 
     function addCourse() {
+        // منع الإفراط: أكثر من 12 مادة في فصل واحد غير منطقي أكاديمياً
+        const count = DOM.coursesContainer.querySelectorAll('.course-card').length;
+        if (count >= MAX_COURSES) {
+            alert(`لا يمكن إضافة أكثر من ${MAX_COURSES} مادة في الفصل الواحد.`);
+            return;
+        }
         const row = createCourseElement();
         DOM.coursesContainer.appendChild(row);
         updateCourseNumbers();
@@ -366,11 +535,13 @@
         const rowIndex = allCards.indexOf(row);
 
         if (allCards.length > 1) {
-            AppState.deletedCourseState = {
+            const hoursVal = row.querySelector('.course-hours').value;
+            const deletedState = {
                 index: rowIndex,
-                hours: row.querySelector('.course-hours').value,
+                hours: hoursVal,
                 grade: row.querySelector('.course-grade').value,
-                isRepeated: row.querySelector('.repeat-checkbox').checked,
+                // مادة الصفر ساعة لا يوجد لها خيار "مادة معادة" => تطبيع القيمة
+                isRepeated: hoursVal !== '0' && row.querySelector('.repeat-checkbox').checked,
                 oldGrade: row.querySelector('.old-grade').value
             };
 
@@ -379,14 +550,27 @@
                 row.remove();
                 updateCourseNumbers();
                 debouncedCalculateAndSave();
-                showUndoToast();
+                // التراجع يُعيد المادة لمكانها الأصلي في القائمة
+                showUndoToast('تم حذف المادة', () => {
+                    const restored = createCourseElement({
+                        ...deletedState,
+                        isRepeated: deletedState.hours !== '0' && !!deletedState.isRepeated
+                    });
+                    const referenceNode = DOM.coursesContainer.children[deletedState.index];
+                    if (referenceNode) DOM.coursesContainer.insertBefore(restored, referenceNode);
+                    else DOM.coursesContainer.appendChild(restored);
+                    updateCourseNumbers();
+                    calculateGPA(true);
+                });
             }, 250);
         } else {
             alert("يجب إبقاء مادة واحدة على الأقل في الجدول.");
         }
     }
 
-    function showUndoToast() {
+    function showUndoToast(message, action) {
+        if (DOM.undoToastMsg) DOM.undoToastMsg.innerText = message;
+        AppState.undoAction = action;
         DOM.undoToast.classList.add('show');
 
         const circle = DOM.circlePath;
@@ -411,9 +595,27 @@
         }, UNDO_TIMEOUT_MS);
     }
 
+    // رسالة تحذير مؤقتة: تظهر 5 ثوانٍ ثم تختفي تلقائياً
+    function showWarnBanner(message) {
+        if (!DOM.warnBanner) return;
+        DOM.warnBanner.innerText = message;
+        DOM.warnBanner.style.display = '';
+        if (AppState.warnTimeout) clearTimeout(AppState.warnTimeout);
+        AppState.warnTimeout = setTimeout(hideWarnBanner, 5000);
+    }
+
+    function hideWarnBanner() {
+        if (!DOM.warnBanner) return;
+        DOM.warnBanner.style.display = 'none';
+        if (AppState.warnTimeout) {
+            clearTimeout(AppState.warnTimeout);
+            AppState.warnTimeout = null;
+        }
+    }
+
     function hideUndoToast() {
         DOM.undoToast.classList.remove('show');
-        AppState.deletedCourseState = null;
+        AppState.undoAction = null;
 
         if (AppState.undoInterval) clearInterval(AppState.undoInterval);
 
@@ -422,67 +624,125 @@
         }, 400);
     }
 
+    // معالج زر "تراجع" في التوست — يعمل لكل العمليات (حذف مادة / ترحيل فصل)
     function undoDelete() {
-        if (AppState.deletedCourseState) {
-            const row = createCourseElement(AppState.deletedCourseState);
-            const container = DOM.coursesContainer;
-            const targetIndex = AppState.deletedCourseState.index;
-            const referenceNode = container.children[targetIndex];
-
-            if (referenceNode) {
-                container.insertBefore(row, referenceNode);
-            } else {
-                container.appendChild(row);
-            }
-
-            updateCourseNumbers();
-            calculateGPA(true);
-            hideUndoToast();
+        if (AppState.undoAction) {
+            const action = AppState.undoAction;
             if (AppState.undoToastTimeout) clearTimeout(AppState.undoToastTimeout);
+            hideUndoToast();
+            action();
         }
     }
 
     // ==========================================
     // 4. العمليات الحسابية، التقدم، والتحذيرات
     // ==========================================
-    function updateProgressSection(finalTotalHours, finalGpa) {
+
+    // حالة أنيميشن الملاحظة: القالب الحالي (للتمييز بين تغيّر الجملة وتغيّر الأرقام فقط)
+    const NoteAnim = { key: null };
+
+    /**
+     * setNote: إذا تغيّر قالب الجملة => تلاشٍ كامل (text-fade) وتُضبط الأرقام فوراً.
+     * إذا ثبت القالب وتغيّرت الأرقام فقط => أنيميشن counter على الأرقام داخل الجملة (بلا تلاشٍ).
+     * القيم تُوضع داخل <span class="note-val"> بالترتيب المطابق لمصفوفة values.
+     */
+    function setNote(key, html, values = [], isFloat = []) {
+        const note = DOM.progressNote;
+
+        if (NoteAnim.key === key) {
+            if (values.length > 0) {
+                // القالب ثابت: counter للأرقام فقط عند تغيّرها
+                const spans = note.querySelectorAll('.note-val');
+                values.forEach((v, i) => {
+                    const span = spans[i];
+                    if (!span) return;
+                    const current = parseFloat(span.textContent) || 0;
+                    if (current !== v) animateValue(span, current, v, 600, !!isFloat[i]);
+                });
+                return;
+            }
+            // قالب بلا أرقام: إذا لم يتغير شيء فلا أنيميشن إطلاقاً
+            if (note.innerHTML === html) return;
+        }
+
+        NoteAnim.key = key;
+        note.innerHTML = html;
+        const spans = note.querySelectorAll('.note-val');
+        values.forEach((v, i) => {
+            if (spans[i]) spans[i].textContent = isFloat[i] ? v.toFixed(2) : String(Math.round(v));
+        });
+        retriggerAnimation(note, 'text-fade');
+    }
+
+    function updateProgressSection(finalTotalHours, gpaHours, finalGpa) {
         const planTotal = parseFloat(DOM.planTotal.value) || 0;
         const planTarget = parseFloat(DOM.planTarget.value) || 0;
 
-        if (planTotal > 0 && finalTotalHours > 0) {
+        // عدم اتساق البيانات: الساعات المنجزة أكبر من خطة التخصص (غالباً رقم الخطة خطأ).
+        // نُنبه المستخدم ونُظلل الحقل — ولا نقصّ أي رقم لأن ذلك يُفسد حساب المعدل.
+        const planInconsistent = planTotal > 0 && finalTotalHours > planTotal;
+        if (planInconsistent) {
+            DOM.planTotal.style.borderColor = 'var(--danger)';
+            DOM.planTotal.style.boxShadow = '0 0 0 3px rgba(218, 41, 28, 0.15)';
+        } else {
+            DOM.planTotal.style.borderColor = '';
+            DOM.planTotal.style.boxShadow = '';
+        }
+
+        if (planInconsistent) {
+            const percentage = 100;
+            DOM.progressFill.style.width = `${percentage}%`;
+            const currentPercent = parseFloat(DOM.progressPercent.innerText) || 0;
+            if (currentPercent !== percentage) {
+                animateValue(DOM.progressPercent, currentPercent, percentage, 600, false, "", "%");
+            }
+            setNote('plan-warning', `⚠️ الساعات المنجزة (<b><span class="note-val">0</span></b>) تتجاوز خطة التخصص (<b><span class="note-val">0</span></b>) — راجع إجمالي ساعات التخصص`, [finalTotalHours, planTotal], [false, false]);
+        } else if (planTotal > 0 && finalTotalHours > 0) {
             let percentage = Math.min(100, Math.round((finalTotalHours / planTotal) * 100));
             DOM.progressFill.style.width = `${percentage}%`;
 
+            // أنيميشن counter للنسبة عند تغيّرها
             const currentPercent = parseFloat(DOM.progressPercent.innerText) || 0;
-            animateValue(DOM.progressPercent, currentPercent, percentage, 600, false, "", "%");
+            if (currentPercent !== percentage) {
+                animateValue(DOM.progressPercent, currentPercent, percentage, 600, false, "", "%");
+            }
 
             const remainingHours = planTotal - finalTotalHours;
             if (planTarget > 0) {
                 if (remainingHours <= 0) {
-                    DOM.progressNote.innerHTML = `<span style="color: var(--primary)">أنهيت الخطة 🎓</span>`;
+                    if (finalGpa >= planTarget) {
+                        setNote('done', `<span style="color: var(--primary)">أنهيت الخطة 🎓</span>`);
+                    } else {
+                        setNote('done-missed', `<span style="color: var(--danger)">أنهيت الخطة دون الوصول للمعدل المستهدف</span>`);
+                    }
                 } else {
-                    const requiredPoints = (planTotal * planTarget) - (finalTotalHours * finalGpa);
+                    // النقاط المكتسبة = الساعات المحتسبة في المعدل × المعدل
+                    // (وليست إجمالي الساعات المُنجزة، لأن مواد "ناجح" تُضاف للساعات بلا نقاط)
+                    const earnedPoints = gpaHours * finalGpa;
+                    const requiredPoints = (planTotal * planTarget) - earnedPoints;
                     const requiredGpa = requiredPoints / remainingHours;
 
                     if (requiredGpa > GRADE_MAX) {
-                        DOM.progressNote.innerHTML = `مستحيل رياضياً ❌`;
+                        setNote('impossible', `مستحيل رياضياً ❌`);
                     } else if (requiredGpa <= 0) {
-                        DOM.progressNote.innerHTML = `<span style="color: var(--primary)">ضمنتها بالفعل ✅</span>`;
+                        setNote('secured', `<span style="color: var(--primary)">ضمنتها بالفعل ✅</span>`);
                     } else {
-                        DOM.progressNote.innerHTML = `تحتاج لمعدل <b style="color: var(--primary)">${requiredGpa.toFixed(2)}</b> في <b>${remainingHours}</b> ساعة للهدف 🎯`;
+                        // القالب ثابت => الأرقام (المعدل المطلوب والساعات المتبقية) بأنيميشن counter
+                        setNote('need', `تحتاج لمعدل <b style="color: var(--primary)"><span class="note-val">0.00</span></b> في <b><span class="note-val">0</span></b> ساعة للهدف 🎯`, [requiredGpa, remainingHours], [true, false]);
                     }
                 }
             } else {
-                DOM.progressNote.innerText = `أنجزت ${finalTotalHours} من أصل ${planTotal} ساعة`;
+                setNote('hours-progress', `أنجزت <b><span class="note-val">0</span></b> من أصل <b><span class="note-val">0</span></b> ساعة`, [finalTotalHours, planTotal], [false, false]);
             }
         } else {
             DOM.progressFill.style.width = `0%`;
             DOM.progressPercent.innerText = `0%`;
-            DOM.progressNote.innerText = `أدخل إجمالي ساعات التخصص والمعدل المستهدف للحساب.`;
+            setNote('idle', `أدخل إجمالي ساعات التخصص والمعدل المستهدف للحساب.`);
         }
     }
 
-    function checkAcademicWarnings(finalTotalHours, finalGpa) {
+    // isUserAction: الاهتزاز والاحتفال يعملان فقط مع تفاعل المستخدم (لا عند فتح الصفحة أو تحميل المكتبات)
+    function checkAcademicWarnings(finalTotalHours, finalGpa, isUserAction) {
         let ratingText = "-";
         if (finalTotalHours > 0) {
             if (finalGpa >= 3.69) ratingText = "امتياز 🥇";
@@ -492,19 +752,23 @@
             else ratingText = "ضعيف ⚠️";
 
             if (finalGpa < 2.00) {
-                if (!AppState.isWarningState) {
+                if (isUserAction && !AppState.isWarningState) {
                     DOM.appContainer.classList.remove('shake-animation');
                     void DOM.appContainer.offsetWidth;
                     DOM.appContainer.classList.add('shake-animation');
                     AppState.isWarningState = true;
+                    // رسالة تحذير مؤقتة (5 ثوانٍ) عند العبور تحت الحد الأدنى
+                    showWarnBanner(`⚠️ تنبيه: معدلك التراكمي ${finalGpa.toFixed(2)} تحت الحد الأدنى للاحتفاظ (2.00) — خطر إنذار أكاديمي`);
                 }
             } else {
                 DOM.appContainer.classList.remove('shake-animation');
                 AppState.isWarningState = false;
+                hideWarnBanner();
             }
 
-            if (finalGpa >= 3.00 && !AppState.hasCelebrated) {
-                triggerConfetti();
+            if (finalGpa >= 3.00 && !AppState.hasCelebrated && isUserAction) {
+                // (12) احتفال مخصص حسب التقدير: ذهبي للامتياز، فضي لجيد جداً
+                triggerConfetti(finalGpa >= 3.69 ? 'gold' : 'silver');
                 AppState.hasCelebrated = true;
             } else if (finalGpa < 3.00) {
                 AppState.hasCelebrated = false;
@@ -514,7 +778,14 @@
             AppState.isWarningState = false;
             AppState.hasCelebrated = false;
         }
-        DOM.gpaRating.innerHTML = `<svg class="icon"><use href="#icon-award"/></svg> التّقدير: ${ratingText}`;
+
+        // تحديث مباشر بدون أي أنيميشن (تم إلغاء نبضة التقدير نهائياً)
+        const ratingHtml = `<svg class="icon"><use href="#icon-award"/></svg> التّقدير: ${ratingText}`;
+        if (DOM.gpaRating.innerHTML !== ratingHtml) DOM.gpaRating.innerHTML = ratingHtml;
+
+        // إخفاء الرسالة إذا عاد المعدل فوق الحد دون عبور جديد
+        if (finalTotalHours === 0 || finalGpa >= 2.00) hideWarnBanner();
+
     }
 
     // isUserAction: true إذا كان التعديل ناتجاً عن فعل مباشر من الطالب (لتحديث وقت الحفظ)
@@ -525,14 +796,19 @@
             AppState.lastSaveTime = new Date(AppState.currentTimestamp);
         }
 
+        // ملاحظة: لا نُقصّ الساعات المقطوعة على سقف خطة التخصص هنا أبداً —
+        // ذلك يُفسد نقاط المعدل التراكمي الحقيقية (المعدل × الساعات).
+        // تضارب الأرقام (ساعات منجزة > خطة التخصص) يُعالج في updateProgressSection كتحذير فقط.
         const oldGpa = parseFloat(DOM.oldGpa.value) || 0;
         const oldHours = parseFloat(DOM.oldHours.value) || 0;
 
         let oldTotalPoints = oldGpa * oldHours;
-        let finalTotalHours = oldHours;
+        let finalTotalHours = oldHours; // إجمالي الساعات المُنجزة (تشمل مواد "ناجح" لأنها اجتياز فعلي)
+        let gpaHours = oldHours;        // الساعات المُحتسبة ضمن معادلة المعدل فقط (تستثني "ناجح"/"راسب")
         let newSemesterPoints = 0;
         let newSemesterHours = 0;
         let registeredSemesterHours = 0;
+
 
         const dataToSave = {
             oldGpa: DOM.oldGpa.value,
@@ -542,6 +818,7 @@
             hist1: DOM.hist1.value,
             hist2: DOM.hist2.value,
             timestamp: AppState.currentTimestamp,
+            gpaHistory: AppState.gpaHistory,
             courses: []
         };
 
@@ -556,21 +833,50 @@
 
             dataToSave.courses.push({ hours: hoursInput, grade: gradeInput, isRepeated: isRepeated, oldGrade: oldGradeInput });
 
-            registeredSemesterHours += hours;
-            if (gradeInput !== "") {
-                const gradeValue = parseFloat(gradeInput) || 0;
+            // تُحسب ساعات الفصل للمواد المقيّمة فقط
+            if (gradeInput !== '') registeredSemesterHours += hours;
+
+            if (gradeInput === 'pass') {
+                // "ناجح": تُضاف ساعاتها لإجمالي المُنجز فقط، ولا تدخل بمعادلة المعدل
                 if (!isRepeated) finalTotalHours += hours;
+            } else if (gradeInput === 'fail') {
+                // "راسب" بدون علامة رقمية: لم تُنجز المادة، فلا تُضاف لا للساعات ولا للمعدل
+            } else if (gradeInput !== "") {
+                const gradeValue = parseFloat(gradeInput) || 0;
+                const oldGradeValue = parseFloat(oldGradeInput) || 0;
+                if (!isRepeated) {
+                    finalTotalHours += hours;
+                    gpaHours += hours;
+                } else if (oldGradeValue <= 1.00) {
+                    // المعادة بعلامة رسوب سابقة (-D / 1.00): الرسوب لم يُحتسب ضمن الساعات
+                    // المقطوعة، فالنجاح في المحاولة الجديدة يضيف ساعاتها لإنجاز الخطة.
+                    finalTotalHours += hours;
+                    // ساعات المعدل تُضاف فقط إذا لم تكن هناك ساعات سابقة مسجلة إطلاقاً
+                    // (لا محاولة سابقة ضمن النقاط => تُعامل كمادة جديدة تماماً في المعدل)
+                    if (oldHours === 0) gpaHours += hours;
+                }
+                // إذا كانت العلامة السابقة (D) أو أعلى: لا يُضاف شيء للساعات المقطوعة
                 newSemesterPoints += (hours * gradeValue);
                 newSemesterHours += hours;
-                if (isRepeated) oldTotalPoints -= (hours * (parseFloat(oldGradeInput) || 0));
+                if (isRepeated && oldHours > 0) {
+                    // خصم نقاط المحاولة السابقة، مع منع النقاط التراكمية السالبة
+                    oldTotalPoints = Math.max(0, oldTotalPoints - (hours * oldGradeValue));
+                }
             }
         });
 
-        saveUserData(dataToSave);
-
         const semesterGpa = newSemesterHours > 0 ? newSemesterPoints / newSemesterHours : 0;
         const finalTotalPoints = oldTotalPoints + newSemesterPoints;
-        const finalGpa = finalTotalHours > 0 ? finalTotalPoints / finalTotalHours : 0;
+        const finalGpa = gpaHours > 0 ? finalTotalPoints / gpaHours : 0;
+
+        // تخزين النتائج الفعلية لاستخدامها في الترحيل بدل قراءة الأرقام أثناء أنيميشنها
+        AppState.lastComputed = {
+            gpa: finalGpa,
+            hours: finalTotalHours,
+            semHours: newSemesterHours
+        };
+
+        saveUserData(dataToSave);
 
         const currentGpa = parseFloat(DOM.resultGpa.innerText) || 0;
         const currentSemGpa = parseFloat(DOM.semesterGpaBadge.innerText.replace(/[^0-9.]/g, '')) || 0;
@@ -578,12 +884,12 @@
         const currentRegHours = parseInt(DOM.semesterHoursBadge.innerText.replace(/[^0-9]/g, ''), 10) || 0;
 
         animateValue(DOM.resultGpa, currentGpa, finalGpa, 250, true, "");
-        animateValue(DOM.semesterGpaBadge, currentSemGpa, semesterGpa, 250, true, `<svg class="icon"><use href="#icon-pie"/></svg> المعدل الفصلي:  `);
-        animateValue(DOM.resultHours, currentHours, finalTotalHours, 250, false, `<svg class="icon"><use href="#icon-clock"/></svg> مجموع السّاعات: `);
+        animateValue(DOM.semesterGpaBadge, currentSemGpa, semesterGpa, 250, true, `<svg class="icon"><use href="#icon-pie"/></svg> الفصلي: `);
+        animateValue(DOM.resultHours, currentHours, finalTotalHours, 250, false, `<svg class="icon"><use href="#icon-clock"/></svg> مجموع الساعات: `);
         animateValue(DOM.semesterHoursBadge, currentRegHours, registeredSemesterHours, 250, false, `ساعات الفصل: `);
 
-        updateProgressSection(finalTotalHours, finalGpa);
-        checkAcademicWarnings(finalTotalHours, finalGpa);
+        updateProgressSection(finalTotalHours, gpaHours, finalGpa);
+        checkAcademicWarnings(finalTotalHours, finalGpa, isUserAction);
         updateChart(oldGpa, finalGpa);
     }
 
@@ -593,13 +899,36 @@
     function updateChart(oldGpa, finalGpa) {
         let chartLabels = [];
         let chartData = [];
-        let h1 = parseFloat(DOM.hist1.value);
-        let h2 = parseFloat(DOM.hist2.value);
 
-        if (!isNaN(h1)) { chartLabels.push(`المعدل الأقدم`); chartData.push(h1); }
-        if (!isNaN(h2)) { chartLabels.push(`المعدل السّابق`); chartData.push(h2); }
-        if (oldGpa > 0) { chartLabels.push('المعدل الحالي'); chartData.push(oldGpa); }
-        chartLabels.push('المعدل الجديد'); chartData.push(parseFloat(finalGpa.toFixed(2)));
+        // دمج كل المصادر زمنياً — لا تُحذف أي نقطة أبداً:
+        // الإدخال اليدوي الأقدم ← سجل الترحيلات التلقائي ← الحالي ← الجديد.
+        // النقاط المتطابقة قيمةً ومتجاورة فقط تُدمج (hist2 = آخر ترحيل مثلاً)
+        // حتى لا يظهر نفس المعدل مرتين بصرياً.
+        const pushPoint = (label, value, force = false) => {
+            const v = parseFloat(value);
+            if (isNaN(v)) return;
+            const last = chartData[chartData.length - 1];
+            if (!force && last !== undefined && Math.abs(last - v) < 0.005) return;
+            chartLabels.push(label);
+            chartData.push(v);
+        };
+
+        const h1 = parseFloat(DOM.hist1.value);
+        const h2 = parseFloat(DOM.hist2.value);
+        if (!isNaN(h1)) pushPoint('المعدل الأقدم', h1);
+        if (!isNaN(h2)) pushPoint('المعدل السابق', h2);
+
+        AppState.gpaHistory.forEach((g, i) => {
+            const d = AppState.gpaHistory.length - i; // المسافة عن الفصل الحالي
+            let label;
+            if (d === 1) label = 'الفصل الماضي';
+            else if (d === 2) label = 'منذ فصلين';
+            else label = `منذ ${d} فصول`;
+            pushPoint(label, g);
+        });
+
+        if (oldGpa > 0) pushPoint('المعدل الحالي', oldGpa);
+        pushPoint('المعدل الجديد', finalGpa, true); // إلزامي: حتى لو ساوى الحالي
 
         const currentDataString = JSON.stringify({ labels: chartLabels, data: chartData });
         if (currentDataString === AppState.lastChartDataString && AppState.chartInstance) return;
@@ -628,13 +957,19 @@
         return AppState.confettiPromise;
     }
 
-    async function triggerConfetti() {
+    // (12) احتفال مخصص حسب المستوى: gold (امتياز) / silver (جيد جداً)
+    async function triggerConfetti(style = 'silver') {
         try { await loadConfettiLib(); } catch (e) { return; }
-        const duration = 3 * 1000;
+        const configs = {
+            gold: { particleCount: 7, spread: 75, colors: ['#f3c300', '#ffd700', '#ffffff', '#006838'], duration: 3.5 },
+            silver: { particleCount: 5, spread: 60, colors: ['#e2e8f0', '#ffffff', '#f3c300'], duration: 3 }
+        };
+        const cfg = configs[style] || configs.silver;
+        const duration = cfg.duration * 1000;
         const end = Date.now() + duration;
         (function frame() {
-            confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#006838', '#f3c300', '#ffffff'] });
-            confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#006838', '#f3c300', '#ffffff'] });
+            confetti({ particleCount: cfg.particleCount, angle: 60, spread: cfg.spread, origin: { x: 0 }, colors: cfg.colors });
+            confetti({ particleCount: cfg.particleCount, angle: 120, spread: cfg.spread, origin: { x: 1 }, colors: cfg.colors });
             if (Date.now() < end) requestAnimationFrame(frame);
         }());
     }
@@ -651,8 +986,6 @@
             AppState.chartInstance.update();
             return;
         }
-
-        if (!canvas || typeof Chart === 'undefined') return; // Chart.js لم يُحمّل بعد
 
         let gradient = ctx.createLinearGradient(0, 0, 0, 350);
         gradient.addColorStop(0, 'rgba(243, 195, 0, 0.5)');
