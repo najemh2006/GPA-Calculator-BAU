@@ -248,7 +248,7 @@ body {
     overflow: hidden;
     contain: layout paint;
     will-change: transform, opacity;
-    transition: transform 0.2s, border-color 0.2s;
+    transition: transform 0.2s, border-color 0.2s, background-color 0.2s;
 }
 
 .course-card.removing {
@@ -358,6 +358,19 @@ select:focus {
     align-items: center;
     justify-content: flex-start;
     gap: 10px;
+    overflow: hidden;
+    max-height: 100px;
+    opacity: 1;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.course-options.hidden-anim {
+    max-height: 0;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .checkbox-label {
@@ -368,6 +381,17 @@ select:focus {
     gap: 6px;
     cursor: pointer;
     font-weight: 600;
+    overflow: hidden;
+    max-width: 200px;
+    opacity: 1;
+    transition: opacity 0.25s ease, max-width 0.25s ease, margin 0.25s ease;
+}
+
+.checkbox-label.hidden-anim {
+    opacity: 0;
+    max-width: 0;
+    margin: 0;
+    pointer-events: none;
 }
 
 .checkbox-label input {
@@ -696,6 +720,37 @@ select:focus {
     0%, 100% { transform: translate3d(0, 0, 0); }
     10%, 30%, 50%, 70%, 90% { transform: translate3d(-3.5px, 0, 0); }
     20%, 40%, 60%, 80% { transform: translate3d(3.5px, 0, 0); }
+}
+
+/* شارة التّقدير (امتياز/جيد جداً...) تنبض عند تغيّر قيمتها فقط */
+@keyframes popIn {
+    0% { transform: scale(0.85); opacity: 0.4; }
+    60% { transform: scale(1.05); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.badge-pop {
+    animation: popIn 0.35s ease-out;
+}
+
+/* ملاحظة الخطة (progressNote) تظهر بتلاشٍ خفيف عند تغيّر نصّها */
+@keyframes fadeSwap {
+    0% { opacity: 0; transform: translateY(-3px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+.text-fade {
+    animation: fadeSwap 0.3s ease-out;
+}
+
+/* نبضة خفيفة على قائمة العلامات عند إعادة بناء خياراتها (تبديل 0 ساعة) */
+@keyframes selectPulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 104, 56, 0.35); }
+    100% { box-shadow: 0 0 0 6px rgba(0, 104, 56, 0); }
+}
+
+.select-pulse {
+    animation: selectPulse 0.5s ease-out;
 }
 
 .shake-animation {
