@@ -61,11 +61,67 @@
         // صندوق الإدخال اليدوي للتتبع (يظهر دائماً الآن بعد إلغاء نظام الشارات)
         DOM.historyContainer = document.querySelector('.history-container');
 
-        // بانر التحذير المبكر — أعلى القسم الأيسر مباشرة
-        DOM.warnBanner = document.createElement('div');
-        DOM.warnBanner.style.cssText = 'display:none;background:rgba(218,41,28,0.88);color:#fff;font-size:0.85rem;font-weight:700;text-align:center;padding:8px 12px;border-radius:10px;margin-bottom:12px;position:relative;z-index:1;';
-        const resultSectionEl = document.querySelector('.result-section');
-        if (resultSectionEl) resultSectionEl.insertBefore(DOM.warnBanner, resultSectionEl.firstChild);
+        // رسالة التحذير العائمة: بطاقة أنيقة خارج الصندوق تماماً —
+        // لا تمس ترتيب أو شكل القسم الأيسر إطلاقاً
+        DOM.warnToast = document.createElement('div');
+        DOM.warnToast.className = 'bau-warn-toast';
+        DOM.warnToast.setAttribute('role', 'alert');
+        document.body.appendChild(DOM.warnToast);
+        const warnStyle = document.createElement('style');
+        warnStyle.textContent = `
+            .bau-warn-toast {
+                position: fixed; bottom: 110px; left: 50%;
+                transform: translateX(-50%);
+                background: #ffffff;
+                border: 1px solid #fee2e2;
+                border-radius: 16px;
+                padding: 14px 18px 17px;
+                display: flex; align-items: center; gap: 12px;
+                max-width: min(440px, 92%);
+                overflow: hidden; /* قصّ الشريط والمحتوى عند الزوايا المدوّرة */
+                box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22), 0 0 0 4px rgba(218, 41, 28, 0.05);
+                z-index: 9999;
+                opacity: 0;
+                pointer-events: none;
+            }
+            .bau-warn-toast.show { animation: bauWarnIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.12) forwards; }
+            .bau-warn-toast.hide { transition: opacity 0.3s ease, transform 0.3s ease; opacity: 0 !important; transform: translateX(-50%) translateY(16px) !important; }
+            .bau-warn-toast .warn-icon {
+                width: 38px; height: 38px; border-radius: 50%;
+                background: rgba(218, 41, 28, 0.1);
+                display: flex; align-items: center; justify-content: center;
+                flex-shrink: 0;
+            }
+            .bau-warn-toast .warn-icon svg {
+                width: 20px; height: 20px;
+                fill: none; stroke: var(--danger);
+                stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+            }
+            .bau-warn-toast .warn-title { font-weight: 800; color: var(--danger); font-size: 0.9rem; }
+            .bau-warn-toast .warn-msg { font-weight: 600; color: #334155; font-size: 0.85rem; margin-top: 2px; }
+            .bau-warn-toast .warn-bar {
+                position: absolute; bottom: 0; inset-inline-start: 0;
+                height: 3px; width: 100%;
+                background: rgba(218, 41, 28, 0.1);
+            }
+            .bau-warn-toast .warn-bar > span {
+                display: block; height: 100%;
+                background: linear-gradient(90deg, #ef4444, var(--danger));
+                border-radius: 3px;
+                animation: bauWarnBar 5s linear forwards;
+            }
+            @keyframes bauWarnIn {
+                0% { opacity: 0; transform: translateX(-50%) translateY(26px) scale(0.94); }
+                60% { opacity: 1; transform: translateX(-50%) translateY(-5px) scale(1.015); }
+                100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+            }
+            @keyframes bauWarnBar { from { width: 100%; } to { width: 0%; } }
+            @media (max-width: 600px) {
+                .bau-warn-toast { bottom: 95px; padding: 11px 14px 14px; gap: 10px; }
+                .bau-warn-toast .warn-icon { width: 32px; height: 32px; font-size: 1rem; }
+            }
+        `;
+        document.head.appendChild(warnStyle);
 
 
         // منع تشغيل أنيميشن الملاحظة عند أول تحميل للصفحة
@@ -595,18 +651,29 @@
         }, UNDO_TIMEOUT_MS);
     }
 
-    // رسالة تحذير مؤقتة: تظهر 5 ثوانٍ ثم تختفي تلقائياً
+    // رسالة تحذير عائمة: بطاقة بأيقونة وعنوان وشريط عدّاد 5 ثوانٍ
     function showWarnBanner(message) {
-        if (!DOM.warnBanner) return;
-        DOM.warnBanner.innerText = message;
-        DOM.warnBanner.style.display = '';
+        if (!DOM.warnToast) return;
+        DOM.warnToast.classList.remove('hide');
+        DOM.warnToast.innerHTML = `
+            <div class="warn-icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+            <div>
+                <div class="warn-title">تنبيه أكاديمي</div>
+                <div class="warn-msg">${message}</div>
+            </div>
+            <div class="warn-bar"><span></span></div>`;
+        // إعادة تشغيل أنيميشن الدخول من جديد
+        DOM.warnToast.classList.remove('show');
+        void DOM.warnToast.offsetWidth;
+        DOM.warnToast.classList.add('show');
         if (AppState.warnTimeout) clearTimeout(AppState.warnTimeout);
         AppState.warnTimeout = setTimeout(hideWarnBanner, 5000);
     }
 
     function hideWarnBanner() {
-        if (!DOM.warnBanner) return;
-        DOM.warnBanner.style.display = 'none';
+        if (!DOM.warnToast) return;
+        DOM.warnToast.classList.remove('show');
+        DOM.warnToast.classList.add('hide');
         if (AppState.warnTimeout) {
             clearTimeout(AppState.warnTimeout);
             AppState.warnTimeout = null;
@@ -758,7 +825,7 @@
                     DOM.appContainer.classList.add('shake-animation');
                     AppState.isWarningState = true;
                     // رسالة تحذير مؤقتة (5 ثوانٍ) عند العبور تحت الحد الأدنى
-                    showWarnBanner(`⚠️ تنبيه: معدلك التراكمي ${finalGpa.toFixed(2)} تحت الحد الأدنى للاحتفاظ (2.00) — خطر إنذار أكاديمي`);
+                    showWarnBanner(`معدلك التراكمي ${finalGpa.toFixed(2)} تحت الحد الأدنى (2.00)`);
                 }
             } else {
                 DOM.appContainer.classList.remove('shake-animation');
