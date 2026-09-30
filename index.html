@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>حساب المعدل التراكمي | جامعة البلقاء التطبيقية</title>
-    
-    <!-- تسريع جلب الملفات الخارجية الضرورية فقط -->
+
+    <!-- تسريع جلب الملفات الخارجية -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
@@ -18,19 +18,20 @@
     <link rel="icon" type="image/png" sizes="16x16" href="favicon/favicon-16x16.png">
     <link rel="icon" type="image/x-icon" href="favicon/favicon.ico">
 
-    <!-- خطوط جوجل -->
+    <!-- الخط -->
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-    
-    <!-- مكتبة Chart.js (تحميل مؤجل) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 
-    <!--ملفات ال CSS, Javasript-->
+    <!-- التنسيق -->
     <link rel="stylesheet" href="css/style.css">
+
+    <!-- السكربتات (defer: تُنفَّذ بالترتيب بعد بناء الصفحة — Chart.js أولاً ثم script.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="js/script.js" defer></script>
+<base target="_blank">
 </head>
 <body>
     <!-- مكتبة الأيقونات المدمجة -->
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <svg class="svg-sprite" width="0" height="0" aria-hidden="true">
         <defs>
             <symbol id="icon-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/><path d="M12 7v5l3 3"/></symbol>
             <symbol id="icon-cap" viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.5 3 3 6 3s6-1.5 6-3v-5"/></symbol>
@@ -42,55 +43,57 @@
             <symbol id="icon-award" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="M15.5 13.5 17 22l-5-3-5 3 1.5-8.5"/></symbol>
             <symbol id="icon-forward" viewBox="0 0 24 24"><path d="M5 4v16l10-8Z"/><path d="M19 5v14"/></symbol>
             <symbol id="icon-undo" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></symbol>
+            <symbol id="icon-warning" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/></symbol>
         </defs>
     </svg>
 
     <div class="app-container" id="appContainer">
-        
+
+        <!-- ============ قسم الإدخال ============ -->
         <div class="input-section">
             <div class="header">
                 <img src="https://www.bau.edu.jo/content/Logo/baulogo.png" alt="شعار البلقاء">
                 <h1>حساب المعدل التّراكمي<span>جامعة البلقاء التطبيقية</span></h1>
             </div>
 
-            <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div class="section-title section-title-row">
                 <span><svg class="icon"><use href="#icon-history"/></svg> السّجل الأكاديمي</span>
-                
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <div style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--primary); font-weight: 700; opacity: 0.8;">
-                        <svg class="icon" style="width: 13px; height: 13px;"><use href="#icon-clock"/></svg>
+
+                <div class="header-actions">
+                    <div class="save-status">
+                        <svg class="icon"><use href="#icon-clock"/></svg>
                         <span id="saveStatusText">تم الحفظ: الآن</span>
                     </div>
-                    
-                    <button onclick="resetCalculator()" title="تفريغ جميع البيانات" aria-label="تفريغ البيانات" style="background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 1.1rem; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+
+                    <button id="resetBtn" class="btn-icon-plain btn-danger-icon" type="button" title="تفريغ جميع البيانات" aria-label="تفريغ البيانات">
                         <svg class="icon"><use href="#icon-trash"/></svg>
                     </button>
                 </div>
             </div>
-            
+
             <div class="grid-2">
                 <div class="form-group">
-                    <label>المعدل الحالي</label>
-                    <input type="text" inputmode="decimal" id="oldGpa" oninput="autoFormatGPA(event)">
+                    <label for="oldGpa">المعدل الحالي</label>
+                    <input type="text" inputmode="decimal" id="oldGpa" data-gpa>
                 </div>
                 <div class="form-group">
-                    <label>السّاعات المقطوعة</label>
-                    <input type="number" id="oldHours" min="0" max="256" oninput="if(this.value > 256) this.value = 256;"> 
+                    <label for="oldHours">السّاعات المقطوعة</label>
+                    <input type="number" id="oldHours" min="0" max="256" data-max="256">
                 </div>
             </div>
 
             <div class="section-title"><svg class="icon"><use href="#icon-cap"/></svg> مخطط التخرج</div>
             <div class="grid-2">
                 <div class="form-group">
-                    <label>إجمالي ساعات التّخصص</label>
-                    <input type="number" id="planTotal" min="132" max="256" oninput="if(this.value > 256) this.value = 256;">
+                    <label for="planTotal">إجمالي ساعات التّخصص</label>
+                    <input type="number" id="planTotal" min="132" max="256" data-max="256">
                 </div>
                 <div class="form-group">
-                    <label>المعدل المستهدف</label>
-                    <input type="text" inputmode="decimal" id="planTarget" oninput="autoFormatGPA(event)">
+                    <label for="planTarget">المعدل المستهدف</label>
+                    <input type="text" inputmode="decimal" id="planTarget" data-gpa>
                 </div>
             </div>
-            
+
             <div class="progress-wrapper" id="progressWrapper">
                 <div class="progress-header">
                     <span>نسبة إنجاز الخطة</span>
@@ -99,43 +102,48 @@
                 <div class="progress-track">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
-                <div class="progress-note" id="progressNote">أدخل إجمالي ساعات التخصص والمعدل المستهدف للحساب.</div>
+                <div class="progress-note-row">
+                    <div class="progress-note" id="progressNote">أدخل إجمالي ساعات التخصص والمعدل المستهدف للحساب.</div>
+                    <button id="detailsBtn" class="details-btn" type="button">التفاصيل</button>
+                </div>
             </div>
 
-            <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="section-title section-title-row">
+                <span class="title-with-icon">
                     <svg class="icon"><use href="#icon-book"/></svg> مواد الفصل الحالي
-                </div>
-                <div id="semesterHoursBadge" style="font-size: 0.85rem; color: var(--primary); background: rgba(0, 104, 56, 0.08); padding: 4px 12px; border-radius: 12px; font-weight: 700; border: 1px solid rgba(0, 104, 56, 0.2);">
-                    ساعات الفصل: 0
-                </div>
+                </span>
+                <div id="semesterHoursBadge" class="semester-hours-badge">ساعات الفصل: 0</div>
             </div>
             <div class="course-list" id="coursesContainer"></div>
-            
-            <button class="btn-add" onclick="addCourse()"><svg class="icon"><use href="#icon-plus"/></svg> إضافة مادة</button>
+
+            <button id="addCourseBtn" class="btn-add" type="button"><svg class="icon"><use href="#icon-plus"/></svg> إضافة مادة</button>
         </div>
 
+        <!-- ============ قسم النتائج ============ -->
         <div class="result-section">
             <div class="result-card">
-            <div class="result-title">المعدل التّراكمي الجديد</div>
-            <div class="gpa-value" id="resultGpa">0.00</div>
-            
-            <div class="stats-container">
-                <div class="stat-badge" id="semesterGpaBadge"><svg class="icon"><use href="#icon-pie"/></svg> الفصلي: 0.00</div>
-                <div class="stat-badge" id="resultHours"><svg class="icon"><use href="#icon-clock"/></svg> مجموع الساعات: 0</div>
-                <div class="stat-badge" id="gpaRating"><svg class="icon"><use href="#icon-award"/></svg> التّقدير: -</div>
-            </div>
-                
-                <button class="btn-next-semester" onclick="moveToNextSemester()" aria-label="الانتقال للفصل القادم">
-                     ترحيل النتيجة و بدء فصل جديد <svg class="icon"><use href="#icon-forward"/></svg>
+                <div class="result-title">المعدل التّراكمي الجديد</div>
+                <div class="gpa-value" id="resultGpa">0.00</div>
+
+                <div class="stats-container">
+                    <div class="stat-badge" id="semesterGpaBadge"><svg class="icon"><use href="#icon-pie"/></svg> الفصلي: 0.00</div>
+                    <div class="stat-badge" id="resultHours"><svg class="icon"><use href="#icon-clock"/></svg> مجموع الساعات: 0</div>
+                    <div class="stat-badge" id="gpaRating"><svg class="icon"><use href="#icon-award"/></svg> التّقدير: -</div>
+                </div>
+
+                <button id="nextSemesterBtn" class="btn-next-semester" type="button" aria-label="الانتقال للفصل القادم">
+                    ترحيل النتيجة و بدء فصل جديد <svg class="icon"><use href="#icon-forward"/></svg>
                 </button>
             </div>
 
             <div class="history-container">
-                <div class="history-title">تتبع التطور (اختياري) - أدخل آخر معدلين تراكميين</div>
+                <div class="history-title-row">
+                    <div class="history-title">تتبع التطور (اختياري) - أدخل آخر معدلين تراكميين </div>
+                    <button id="historyBtn" class="history-btn" type="button">إضافة جميع الفصول</button>
+                </div>
                 <div class="history-grid">
-                    <input type="text" inputmode="decimal" id="hist1" placeholder="المعدل الأقدم" oninput="autoFormatGPA(event)">
-                    <input type="text" inputmode="decimal" id="hist2" placeholder="المعدل الأحدث" oninput="autoFormatGPA(event)">
+                    <input type="text" inputmode="decimal" id="hist1" placeholder="المعدل الأقدم" aria-label="المعدل الأقدم" data-gpa>
+                    <input type="text" inputmode="decimal" id="hist2" placeholder="المعدل الأحدث" aria-label="المعدل الأحدث" data-gpa>
                 </div>
             </div>
 
@@ -145,20 +153,112 @@
         </div>
     </div>
 
+    <!-- نافذة تفاصيل استقرار المعدل (المحتوى الديناميكي يُبنى في script.js من القوالب أدناه) -->
+    <div id="detailsModal" class="bau-modal" role="dialog" aria-modal="true" hidden>
+        <div class="bau-modal-backdrop" id="detailsBackdrop"></div>
+        <div class="bau-modal-card">
+            <div class="bau-modal-header">
+                <h3>📊 تفاصيل استقرار المعدل</h3>
+                <button id="detailsCloseBtn" class="bau-modal-close" type="button" aria-label="إغلاق">✕</button>
+            </div>
+            <div id="detailsBody" class="bau-modal-body"></div>
+        </div>
+    </div>
+
+    <!-- نافذة إدارة فصول التتبع (صفوفها تُبنى ديناميكياً مثل بطاقات المواد) -->
+    <div id="historyModal" class="bau-modal" role="dialog" aria-modal="true" hidden>
+        <div class="bau-modal-backdrop" id="historyBackdrop"></div>
+        <div class="bau-modal-card bau-modal-card--history">
+            <div class="bau-modal-header">
+                <h3>📈 تتبع المعدل التّراكمي</h3>
+                <button id="historyCloseBtn" class="bau-modal-close" type="button" aria-label="إغلاق">✕</button>
+            </div>
+            <div id="historyList" class="hist-list"></div>
+            <div class="hist-footer">
+                <button id="historyAddBtn" class="btn-add-sm" type="button"><svg class="icon"><use href="#icon-plus"/></svg> إضافة معدل</button>
+                <button id="historySaveBtn" class="btn-primary-sm" type="button">حفظ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- رسالة التحذير العائمة (script.js يملأ النص ويعيد تشغيل الحركة فقط) -->
+    <div id="warnToast" class="bau-warn-toast" role="alert" aria-live="assertive">
+        <div class="warn-icon"><svg viewBox="0 0 24 24"><use href="#icon-warning"/></svg></div>
+        <div>
+            <div class="warn-title">تنبيه أكاديمي</div>
+            <div class="warn-msg" id="warnMsg"></div>
+        </div>
+        <div class="warn-bar"><span></span></div>
+    </div>
+
+    <!-- إشعار التراجع -->
     <div id="undoToast" class="undo-toast">
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div class="toast-inner">
             <div class="countdown-circle">
                 <svg viewBox="0 0 36 36">
                     <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path class="circle-path" id="circlePath" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path class="circle-path" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                 </svg>
                 <span id="undoTimerText">5</span>
             </div>
-            <span>تم حذف المادة</span>
+            <span id="undoMsg">تم حذف المادة</span>
         </div>
-        <button type="button" onclick="undoDelete()">
+        <button id="undoBtn" type="button">
             <svg class="icon"><use href="#icon-undo"/></svg> تراجع
         </button>
     </div>
+
+    <!-- ============ القوالب (هيكل يُستنسخ برمجياً) ============ -->
+
+    <!-- بطاقة مادة -->
+    <template id="courseTemplate">
+        <div class="course-card">
+            <div class="course-main">
+                <span class="course-number course-number-box"></span>
+                <select class="course-hours" aria-label="اختر عدد الساعات">
+                    <option value="0">0 ساعة</option>
+                    <option value="1">ساعة</option>
+                    <option value="2">ساعتان</option>
+                    <option value="3">3 ساعات</option>
+                    <option value="4">4 ساعات</option>
+                    <option value="5">5 ساعات</option>
+                    <option value="6">6 ساعات</option>
+                </select>
+                <select class="course-grade" aria-label="اختر العلامة"></select>
+                <button type="button" class="btn-icon delete-btn" aria-label="حذف المادة"><svg class="icon"><use href="#icon-trash"/></svg></button>
+            </div>
+            <div class="course-options">
+                <label class="checkbox-label"><input type="checkbox" class="repeat-checkbox"> مادة معادة؟</label>
+                <div class="old-grade-wrapper">
+                    <label class="old-grade-label">العلامة السّابقة:</label>
+                    <select class="old-grade" aria-label="العلامة السابقة">
+                        <option value="2.25">(-C)</option>
+                        <option value="2.00">(+D)</option>
+                        <option value="1.25">(D)</option>
+                        <option value="1.00">(رسوب) (-D)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- جمل ملاحظة الخطة (الأرقام المتغيرة داخل .note-val) -->
+    <template id="noteTemplates">
+        <span data-note="idle">أدخل إجمالي ساعات التخصص والمعدل المستهدف للحساب.</span>
+        <span data-note="plan-warning">⚠️ الساعات المنجزة (<b class="note-val"></b>) تتجاوز خطة التخصص (<b class="note-val"></b>) — راجع إجمالي ساعات التخصص</span>
+        <span data-note="hours-progress">أنجزت <b class="note-val"></b> من أصل <b class="note-val"></b> ساعة</span>
+        <span data-note="need">تحتاج لمعدل <b class="note-val note-ok"></b> في <b class="note-val"></b> ساعة للهدف 🎯</span>
+        <span data-note="impossible">مستحيل رياضياً ❌</span>
+        <span data-note="secured" class="note-ok">ضمنتها بالفعل ✅</span>
+        <span data-note="done" class="note-ok">أنهيت الخطة 🎓</span>
+        <span data-note="done-missed" class="note-bad">أنهيت الخطة دون الوصول للمعدل المستهدف</span>
+    </template>
+
+    <!-- أجزاء ثابتة من نافذة التفاصيل -->
+    <template id="detailTemplates">
+        <div data-tpl="empty-no-data" class="detail-empty">📭<br>أدخل معدلك الحالي وساعاتك المقطوعة<br>لعرض تحليل الاستقرار كاملاً</div>
+        <div data-tpl="empty-no-plan" class="detail-empty detail-empty--compact">أدخل <b>إجمالي ساعات التخصص</b> في "مخطط التخرج"<br>لتفعيل معادلة الاستقرار الكاملة</div>
+        <div data-tpl="rule" class="detail-rule">📜 <b>المعادلة:</b> سقف التحسن = (4.00 − معدلك) × الساعات المتبقية ÷ ساعات التخصص. نعتبر المعدل <b>شبه مثبت</b> عندما يصبح السقف ≤ <span class="rule-delta"></span>. السقف ينكمش تلقائياً كلما اقتربت من إتمام الخطة — وتعمل المعادلة مع أي حجم تخصص (72، 132، 162، 256...).</div>
+    </template>
 </body>
 </html>
