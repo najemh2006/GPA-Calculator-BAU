@@ -1,13 +1,6 @@
 /* =========================================
-    1. الإعدادات الأساسية والمتغيرات
+   1. المتغيرات والإعدادات الأساسية
 ========================================= */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Tajawal', sans-serif;
-}
-
 :root {
     --primary: #006838;
     --secondary: #f3c300;
@@ -15,39 +8,38 @@
     --text-main: #1a1a1a;
     --text-muted: #64748b;
     --danger: #da291c;
+    --success: #16a34a;
+    --fail: #dc2626;
+    --warn: #b45309;
     --border: #e2e8f0;
     --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    /* مدد العدّادات — يضبطها script.js من ثوابته حتى تبقى قيمة واحدة */
+    --undo-duration: 5s;
+    --warn-duration: 5s;
 }
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Tajawal', sans-serif;
+}
+
+html { overflow-x: hidden; }
+
+/* العناصر المخفية تبقى مخفية مهما كان display الأصلي */
+[hidden] { display: none !important; }
 
 input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
 
-input[type="number"] {
-    -moz-appearance: textfield;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-}
-
-/* تنسيق أيقونات SVG المدمجة (تغني عن FontAwesome) */
+/* أيقونات SVG المدمجة */
 .icon {
     width: 1em;
     height: 1em;
@@ -60,8 +52,10 @@ input[type="number"] {
     stroke-linejoin: round;
 }
 
+.svg-sprite { position: absolute; }
+
 /* =========================================
-    2. الهيكل والتخطيط الأساسي (Layout)
+   2. الهيكل والتخطيط
 ========================================= */
 body {
     background: linear-gradient(135deg, rgba(0, 104, 56, 0.95) 0%, rgba(26, 26, 26, 0.95) 100%), url('https://upload.wikimedia.org/wikipedia/commons/8/87/Balqa_Applied_University_Logo.png') center/cover fixed;
@@ -83,14 +77,13 @@ body {
     overflow: hidden;
     display: grid;
     grid-template-columns: 1fr 1.5fr;
-    border: none;
     transform: translateZ(0);
     transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
     contain: layout paint;
 }
 
 /* =========================================
-    3. القسم الأيمن (نموذج الإدخال)
+   3. قسم الإدخال
 ========================================= */
 .input-section {
     background-color: var(--surface);
@@ -98,36 +91,13 @@ body {
     border-left: 1px solid var(--border);
     height: 100%;
     overflow-y: auto;
-    display: block;
-    flex-direction: column;
     -webkit-overflow-scrolling: touch;
 }
 
-.header {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 1.5rem;
-}
-
-.header img {
-    width: 55px;
-    height: auto;
-}
-
-.header h1 {
-    color: var(--primary);
-    font-size: 1.2rem;
-    font-weight: 800;
-    line-height: 1.3;
-}
-
-.header h1 span {
-    display: block;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    font-weight: 500;
-}
+.header { display: flex; align-items: center; gap: 15px; margin-bottom: 1.5rem; }
+.header img { width: 55px; height: auto; }
+.header h1 { color: var(--primary); font-size: 1.2rem; font-weight: 800; line-height: 1.3; }
+.header h1 span { display: block; color: var(--text-muted); font-size: 0.85rem; font-weight: 500; }
 
 .section-title {
     font-size: 1rem;
@@ -139,29 +109,40 @@ body {
     gap: 8px;
 }
 
-.section-title .icon {
-    color: var(--secondary);
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
-}
+.section-title .icon { color: var(--secondary); filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)); }
 
-.grid-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 1.5rem;
-}
+.section-title-row { justify-content: space-between; width: 100%; }
+.title-with-icon { display: flex; align-items: center; gap: 8px; }
 
-.form-group {
+.header-actions { display: flex; align-items: center; gap: 15px; }
+
+.save-status {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: var(--primary);
+    font-weight: 700;
+    opacity: 0.8;
 }
+.save-status .icon { width: 13px; height: 13px; }
 
-.form-group label {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-muted);
+.btn-icon-plain {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 4px;
+    transition: transform 0.2s, color 0.2s;
 }
+.btn-danger-icon { color: var(--danger); }
+.btn-danger-icon:hover { transform: scale(1.1); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.5rem; }
+
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
 
 .form-group input {
     padding: 10px 12px;
@@ -181,7 +162,13 @@ body {
     box-shadow: 0 0 0 3px rgba(0, 104, 56, 0.1);
 }
 
-/* --- شريط الإنجاز والملاحظة المدمجة الثابتة --- */
+/* حقل بقيمة متضاربة (مثلاً الساعات المنجزة أكبر من خطة التخصص) */
+.form-group input.is-invalid {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(218, 41, 28, 0.15);
+}
+
+/* --- شريط الإنجاز والملاحظة --- */
 .progress-wrapper {
     background: #f8fafc;
     border: 1px solid var(--border);
@@ -205,7 +192,7 @@ body {
 .progress-track {
     width: 100%;
     height: 8px;
-    background: #e2e8f0;
+    background: var(--border);
     border-radius: 10px;
     overflow: hidden;
     position: relative;
@@ -213,34 +200,68 @@ body {
 
 .progress-fill {
     height: 100%;
+    width: var(--progress, 0%); /* يضبطها script.js */
     background: var(--secondary);
-    width: 0%;
     border-radius: 10px;
     transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
     box-shadow: 0 0 8px rgba(243, 195, 0, 0.4);
 }
 
+.progress-note-row { display: flex; align-items: center; gap: 8px; }
+
 .progress-note {
+    flex: 1;
+    min-width: 0;
     font-size: 0.8rem;
     font-weight: 700;
     color: var(--text-muted);
-    text-align: center;
+    text-align: right;
     line-height: 1.2;
 }
 
-/* --- مواد الفصل --- */
-.course-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 1rem;
+.note-ok { color: var(--primary); }
+.note-bad { color: var(--danger); }
+
+.details-btn {
+    font-family: 'Tajawal', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--primary);
+    background: rgba(0, 104, 56, 0.07);
+    border: 1px solid rgba(0, 104, 56, 0.28);
+    padding: 3px 13px;
+    border-radius: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
+.details-btn:hover {
+    background: var(--primary);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0, 104, 56, 0.25);
+}
+.details-btn:active { transform: translateY(0) scale(0.97); }
+
+.semester-hours-badge {
+    font-size: 0.85rem;
+    color: var(--primary);
+    background: rgba(0, 104, 56, 0.08);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 700;
+    border: 1px solid rgba(0, 104, 56, 0.2);
+}
+
+/* --- مواد الفصل --- */
+.course-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 1rem; }
 
 .course-card {
     background: #ffffff;
     padding: 12px 15px;
     border-radius: 12px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid var(--border);
     margin-bottom: 10px;
     animation: slideIn 0.3s ease-out;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
@@ -249,16 +270,6 @@ body {
     contain: layout paint;
     will-change: transform, opacity;
     transition: transform 0.2s, border-color 0.2s, background-color 0.2s;
-}
-
-.course-card.removing {
-    opacity: 0;
-    transform: scale(0.9) translateY(-10px);
-    max-height: 0;
-    padding: 0;
-    margin: 0;
-    border-width: 0;
-    transition: all 0.3s ease;
 }
 
 .course-card:hover {
@@ -272,11 +283,17 @@ body {
     background-color: rgba(243, 195, 0, 0.04);
 }
 
-.course-main {
-    display: flex;
-    gap: 8px;
-    align-items: center;
+.course-card.removing {
+    opacity: 0;
+    transform: scale(0.9) translateY(-10px);
+    max-height: 0;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    transition: all 0.3s ease;
 }
+
+.course-main { display: flex; gap: 8px; align-items: center; }
 
 .btn-icon {
     background: rgba(218, 41, 28, 0.1);
@@ -292,15 +309,8 @@ body {
     transition: 0.2s;
     flex-shrink: 0;
 }
-
-.btn-icon:hover {
-    background: var(--danger);
-    color: white;
-}
-
-.btn-icon:active {
-    transform: scale(0.95);
-}
+.btn-icon:hover { background: var(--danger); color: white; }
+.btn-icon:active { transform: scale(0.95); }
 
 .course-number-box {
     background: rgba(243, 195, 0, 0.12);
@@ -327,11 +337,10 @@ select {
     background-repeat: no-repeat;
     background-position: left 0.7rem center;
     background-size: 1em;
-    padding: 8px;
-    padding-left: 2rem !important;
+    padding: 8px 8px 8px 2rem;
     font-size: 0.95rem;
     text-align: center;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border);
     border-radius: 8px;
     outline: none;
     transition: 0.2s ease;
@@ -339,11 +348,7 @@ select {
     height: 40px;
     min-width: 0;
 }
-
-select:hover {
-    border-color: var(--primary);
-}
-
+select:hover { border-color: var(--primary); }
 select:focus {
     border-color: var(--primary);
     background-color: #fff;
@@ -353,7 +358,7 @@ select:focus {
 .course-options {
     margin-top: 10px;
     padding-top: 8px;
-    border-top: 1px dashed #e2e8f0;
+    border-top: 1px dashed var(--border);
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -362,15 +367,6 @@ select:focus {
     max-height: 100px;
     opacity: 1;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.course-options.hidden-anim {
-    max-height: 0;
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
-    opacity: 0;
-    pointer-events: none;
 }
 
 .checkbox-label {
@@ -383,22 +379,8 @@ select:focus {
     font-weight: 600;
     overflow: hidden;
     max-width: 200px;
-    opacity: 1;
-    transition: opacity 0.25s ease, max-width 0.25s ease, margin 0.25s ease;
 }
-
-.checkbox-label.hidden-anim {
-    opacity: 0;
-    max-width: 0;
-    margin: 0;
-    pointer-events: none;
-}
-
-.checkbox-label input {
-    width: 14px;
-    height: 14px;
-    accent-color: var(--primary);
-}
+.checkbox-label input { width: 14px; height: 14px; accent-color: var(--primary); }
 
 .old-grade-wrapper {
     max-height: 0;
@@ -407,20 +389,15 @@ select:focus {
     display: flex;
     align-items: center;
     gap: 3px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     margin-top: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.old-grade-wrapper.show { max-height: 60px; opacity: 1; margin-top: 5px; }
+.old-grade-wrapper select { padding-left: 5px; background-image: none; }
+.old-grade-label { font-size: 0.7rem; color: var(--text-muted); }
 
-.old-grade-wrapper.show {
-    max-height: 60px;
-    opacity: 1;
-    margin-top: 5px;
-}
-
-.old-grade-wrapper select {
-    padding-left: 5px !important;
-    background-image: none;
-}
+/* نبضة خفيفة على قائمة العلامات عند إعادة بناء خياراتها (تبديل 0 ساعة) */
+.select-pulse { animation: selectPulse 0.5s ease-out; }
 
 .btn-add {
     width: 100%;
@@ -439,19 +416,11 @@ select:focus {
     margin-bottom: 2rem;
     gap: 8px;
 }
-
-.btn-add:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: rgba(0, 104, 56, 0.05);
-}
-
-.btn-add:active {
-    transform: scale(0.98);
-}
+.btn-add:hover { border-color: var(--primary); color: var(--primary); background: rgba(0, 104, 56, 0.05); }
+.btn-add:active { transform: scale(0.98); }
 
 /* =========================================
-    4. القسم الأيسر (عرض النتائج)
+   4. قسم النتائج
 ========================================= */
 .result-section {
     background-color: var(--primary);
@@ -469,33 +438,17 @@ select:focus {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-        to bottom right,
-        rgba(0, 0, 0, 0.1),
-        rgba(0, 0, 0, 0.4)
-    );
+    background: linear-gradient(to bottom right, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.4));
     pointer-events: none;
 }
 
 .result-card,
 .history-container,
 .chart-wrapper,
-.stats-container {
-    position: relative;
-    z-index: 1;
-}
+.stats-container { position: relative; z-index: 1; }
 
-.result-card {
-    text-align: center;
-    margin-bottom: 0;
-}
-
-.result-title {
-    font-size: 1.15rem;
-    color: rgba(255, 255, 255, 0.9);
-    margin-bottom: 5px;
-    font-weight: 500;
-}
+.result-card { text-align: center; margin-bottom: 0; }
+.result-title { font-size: 1.15rem; color: rgba(255, 255, 255, 0.9); margin-bottom: 5px; font-weight: 500; }
 
 .gpa-value {
     font-size: clamp(2.5rem, 5vw, 4rem);
@@ -506,12 +459,7 @@ select:focus {
     margin-bottom: 8px;
 }
 
-.stats-container {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    flex-wrap: wrap;
-}
+.stats-container { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; }
 
 .stat-badge {
     display: inline-flex;
@@ -525,16 +473,12 @@ select:focus {
     backdrop-filter: blur(5px);
     border: 1px solid rgba(255, 255, 255, 0.15);
 }
-
-.stat-badge .icon {
-    color: var(--secondary);
-}
+.stat-badge .icon { color: var(--secondary); }
 
 .btn-next-semester {
     width: 100%;
     padding: 10px;
-    margin-top: 15px;
-    margin-bottom: 15px;
+    margin: 15px 0;
     background: rgba(255, 255, 255, 0.15);
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: white;
@@ -549,16 +493,12 @@ select:focus {
     gap: 8px;
     backdrop-filter: blur(5px);
 }
-
 .btn-next-semester:hover {
     background: rgba(255, 255, 255, 0.25);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
-
-.btn-next-semester:active {
-    transform: translateY(0);
-}
+.btn-next-semester:active { transform: translateY(0); }
 
 .history-container {
     background: rgba(255, 255, 255, 0.05);
@@ -566,21 +506,10 @@ select:focus {
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.15);
     margin-bottom: 10px;
-    margin-top: 0;
 }
 
-.history-title {
-    font-size: 0.95rem;
-    color: rgba(255, 255, 255, 0.9);
-    margin-bottom: 12px;
-    text-align: center;
-}
-
-.history-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-}
+.history-title { font-size: 0.95rem; color: rgba(255, 255, 255, 0.9); margin-bottom: 12px; text-align: center; }
+.history-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 
 .history-grid input {
     background: rgba(255, 255, 255, 0.1);
@@ -593,16 +522,8 @@ select:focus {
     outline: none;
     transition: 0.3s;
 }
-
-.history-grid input:focus {
-    background: rgba(255, 255, 255, 0.25);
-    border-color: var(--secondary);
-}
-
-.history-grid input::placeholder {
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 0.9rem;
-}
+.history-grid input:focus { background: rgba(255, 255, 255, 0.25); border-color: var(--secondary); }
+.history-grid input::placeholder { color: rgba(255, 255, 255, 0.5); font-size: 0.9rem; }
 
 .chart-wrapper {
     background: rgba(255, 255, 255, 0.05);
@@ -615,13 +536,12 @@ select:focus {
     min-height: 150px;
     transition: all 0.3s ease;
 }
+.chart-wrapper:hover { background: rgba(255, 255, 255, 0.08); }
 
-.chart-wrapper:hover {
-    background: rgba(255, 255, 255, 0.08);
-}
+#gpaChart { width: 100% !important; height: 100% !important; }
 
 /* =========================================
-    5. إشعار التراجع عن الحذف (Undo Toast)
+   5. إشعار التراجع (Undo Toast)
 ========================================= */
 .undo-toast {
     position: fixed;
@@ -642,8 +562,9 @@ select:focus {
     font-size: 0.95rem;
     font-weight: 700;
 }
-
 .undo-toast.show { bottom: 30px; }
+
+.toast-inner { display: flex; align-items: center; gap: 10px; }
 
 .undo-toast button {
     background: var(--secondary);
@@ -652,17 +573,14 @@ select:focus {
     padding: 6px 14px;
     border-radius: 8px;
     font-weight: 700;
-    font-family: 'Tajawal', sans-serif;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 5px;
     transition: transform 0.2s, background 0.2s;
 }
-
 .undo-toast button:hover { transform: scale(1.05); background: #facc15; }
 
-/* --- العداد الدائري --- */
 .countdown-circle {
     position: relative;
     width: 28px;
@@ -672,17 +590,10 @@ select:focus {
     justify-content: center;
     flex-shrink: 0;
 }
-.countdown-circle svg {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    transform: rotate(-90deg);
-}
-.circle-bg {
-    fill: none;
-    stroke: #f1f5f9;
-    stroke-width: 3;
-}
+.countdown-circle svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.countdown-circle span { font-size: 0.85rem; font-weight: 800; color: var(--danger); z-index: 1; }
+
+.circle-bg { fill: none; stroke: #f1f5f9; stroke-width: 3; }
 .circle-path {
     fill: none;
     stroke: var(--danger);
@@ -691,30 +602,259 @@ select:focus {
     stroke-dasharray: 100;
     stroke-dashoffset: 0;
 }
-.countdown-circle span {
-    font-size: 0.85rem;
-    font-weight: 800;
-    color: var(--danger);
-    z-index: 1;
-}
-
-#gpaChart {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-@keyframes circleCountdown {
-    0% { stroke-dashoffset: 0; }
-    100% { stroke-dashoffset: 100; }
-}
+/* يُضاف الكلاس من script.js عند إظهار الإشعار (ويُزال بعد اختفائه) */
+.undo-toast.is-counting .circle-path { animation: circleCountdown var(--undo-duration) linear forwards; }
 
 /* =========================================
-    6. الحركات والتجاوب (Responsive)
+   6. رسالة التحذير العائمة (Warn Toast)
 ========================================= */
-@keyframes slideIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+.bau-warn-toast {
+    position: fixed;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffffff;
+    border: 1px solid #fee2e2;
+    border-radius: 16px;
+    padding: 14px 18px 17px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: min(440px, 92%);
+    overflow: hidden;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22), 0 0 0 4px rgba(218, 41, 28, 0.05);
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
 }
+
+.bau-warn-toast.show { animation: bauWarnIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.12) forwards; }
+
+.bau-warn-toast.hide {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 0 !important;
+    transform: translateX(-50%) translateY(16px) !important;
+}
+
+.warn-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(218, 41, 28, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.warn-icon svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: var(--danger);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.warn-title { font-weight: 800; color: var(--danger); font-size: 0.9rem; }
+.warn-msg { font-weight: 600; color: #334155; font-size: 0.85rem; margin-top: 2px; }
+
+.warn-bar {
+    position: absolute;
+    bottom: 0;
+    inset-inline-start: 0;
+    height: 3px;
+    width: 100%;
+    background: rgba(218, 41, 28, 0.1);
+}
+.warn-bar > span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #ef4444, var(--danger));
+    border-radius: 3px;
+}
+.bau-warn-toast.show .warn-bar > span { animation: bauWarnBar var(--warn-duration) linear forwards; }
+
+/* =========================================
+   7. نافذة تفاصيل استقرار المعدل
+========================================= */
+.bau-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.bau-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 18, 13, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.bau-modal.open .bau-modal-backdrop { opacity: 1; }
+
+.bau-modal-card {
+    position: relative;
+    background: #ffffff;
+    border-radius: 20px;
+    width: min(440px, 94vw);
+    max-height: 86vh;
+    overflow-y: auto;
+    padding: 20px 22px 22px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 104, 56, 0.06);
+    opacity: 0;
+    /* إخفاء شريط التمرير نهائياً (التمرير يبقى بالعجلة/اللمس/لوحة المفاتيح) */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.bau-modal-card::-webkit-scrollbar { display: none; }
+
+.bau-modal.open .bau-modal-card { animation: modalIn 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
+.bau-modal.closing .bau-modal-card { animation: modalOut 0.2s ease-in forwards; }
+
+.bau-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid rgba(0, 104, 56, 0.1);
+}
+.bau-modal-header h3 { color: var(--primary); font-size: 1rem; font-weight: 800; }
+
+.bau-modal-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(100, 116, 139, 0.1);
+    color: var(--text-muted);
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+    line-height: 1;
+    transition: background 0.2s, color 0.2s, transform 0.3s;
+}
+.bau-modal-close:hover { background: var(--danger); color: #fff; transform: rotate(90deg); }
+
+.bau-modal-body { display: flex; flex-direction: column; gap: 12px; }
+
+/* عناصر التفاصيل — ظهور متدرج (--i يضبطه script.js) */
+.detail-item {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    opacity: 0;
+    transform: translateY(12px);
+    animation: detailIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    animation-delay: calc(var(--i, 0) * 0.07s);
+}
+
+.detail-label {
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: var(--text-main);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.detail-label .icon { color: var(--secondary); }
+
+/* رقم الاستقرار الكبير + الشريط */
+.stab-hero { display: flex; flex-direction: column; gap: 8px; }
+.stab-hero-top { display: flex; align-items: baseline; justify-content: space-between; }
+
+.stab-hero-num { font-size: 1.5rem; font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+.stab-hero-num small { font-size: 0.75rem; color: var(--text-muted); font-weight: 700; }
+
+.stab-hero-state { font-size: 0.72rem; font-weight: 800; padding: 3px 10px; border-radius: 11px; }
+.stab-hero-state.ok { color: var(--primary); background: rgba(0, 104, 56, 0.09); border: 1px solid rgba(0, 104, 56, 0.3); }
+.stab-hero-state.wait { color: var(--warn); background: rgba(180, 83, 9, 0.08); border: 1px solid rgba(180, 83, 9, 0.3); }
+
+.stab-hero-bar { width: 100%; height: 9px; background: var(--border); border-radius: 8px; overflow: hidden; }
+.stab-hero-bar > span {
+    display: block;
+    height: 100%;
+    width: var(--pct, 0%);
+    background: linear-gradient(90deg, var(--secondary), var(--primary));
+    border-radius: 8px;
+    animation: dBarGrow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.stab-hero-cap { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); }
+
+/* صفوف الأثر */
+.effect-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-top: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+.effect-row .grade-tag { font-weight: 800; min-width: 44px; }
+.effect-row .d-val { font-variant-numeric: tabular-nums; font-weight: 800; }
+.effect-row .d-val--lg { font-size: 0.95rem; }
+
+/* درجات تأثير الفصل الحالي */
+.effect-row--ok     { background: rgba(0, 104, 56, 0.07);    border-color: rgba(0, 104, 56, 0.3); }
+.effect-row--strong { background: rgba(180, 83, 9, 0.08);    border-color: rgba(180, 83, 9, 0.3); }
+.effect-row--medium { background: rgba(100, 116, 139, 0.07); border-color: rgba(100, 116, 139, 0.3); }
+.effect-row--light  { background: rgba(148, 163, 184, 0.08); border-color: rgba(148, 163, 184, 0.3); }
+
+.tone-primary { color: var(--primary); }
+.tone-strong  { color: var(--warn); }
+.tone-medium  { color: var(--text-muted); }
+.tone-light   { color: #94a3b8; }
+.is-up   { color: var(--success); }
+.is-down { color: var(--fail); }
+
+.grade-tag--best  { color: var(--primary); }
+.grade-tag--worst { color: var(--danger); }
+
+/* القاعدة الختامية */
+.detail-rule {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    line-height: 1.7;
+    padding: 10px 12px;
+    background: rgba(243, 195, 0, 0.07);
+    border: 1px dashed rgba(243, 195, 0, 0.45);
+    border-radius: 12px;
+}
+
+/* حالة فارغة */
+.detail-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-weight: 700;
+    font-size: 0.85rem;
+    padding: 26px 10px;
+    line-height: 1.8;
+}
+.detail-empty--compact { padding: 14px 8px; }
+
+/* =========================================
+   8. الحركات (Keyframes) والحالات
+========================================= */
+@keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
 @keyframes shake {
     0%, 100% { transform: translate3d(0, 0, 0); }
@@ -722,43 +862,43 @@ select:focus {
     20%, 40%, 60%, 80% { transform: translate3d(3.5px, 0, 0); }
 }
 
-/* شارة التّقدير (امتياز/جيد جداً...) تنبض عند تغيّر قيمتها فقط */
-@keyframes popIn {
-    0% { transform: scale(0.85); opacity: 0.4; }
-    60% { transform: scale(1.05); opacity: 1; }
-    100% { transform: scale(1); opacity: 1; }
-}
+/* ملاحظة الخطة تظهر بتلاشٍ خفيف عند تغيّر قالب نصّها */
+@keyframes fadeSwap { 0% { opacity: 0; transform: translateY(-3px); } 100% { opacity: 1; transform: translateY(0); } }
 
-.badge-pop {
-    animation: popIn 0.35s ease-out;
-}
-
-/* ملاحظة الخطة (progressNote) تظهر بتلاشٍ خفيف عند تغيّر نصّها */
-@keyframes fadeSwap {
-    0% { opacity: 0; transform: translateY(-3px); }
-    100% { opacity: 1; transform: translateY(0); }
-}
-
-.text-fade {
-    animation: fadeSwap 0.3s ease-out;
-}
-
-/* نبضة خفيفة على قائمة العلامات عند إعادة بناء خياراتها (تبديل 0 ساعة) */
 @keyframes selectPulse {
     0% { box-shadow: 0 0 0 0 rgba(0, 104, 56, 0.35); }
     100% { box-shadow: 0 0 0 6px rgba(0, 104, 56, 0); }
 }
 
-.select-pulse {
-    animation: selectPulse 0.5s ease-out;
+@keyframes circleCountdown { 0% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 100; } }
+
+@keyframes bauWarnIn {
+    0% { opacity: 0; transform: translateX(-50%) translateY(26px) scale(0.94); }
+    60% { opacity: 1; transform: translateX(-50%) translateY(-5px) scale(1.015); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
-.shake-animation {
-    animation: shake 0.6s cubic-bezier(.36, .07, .19, .97) both !important;
+@keyframes bauWarnBar { from { width: 100%; } to { width: 0%; } }
+
+@keyframes modalIn {
+    from { opacity: 0; transform: translateY(18px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-html { overflow-x: hidden; }
+@keyframes modalOut {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to { opacity: 0; transform: translateY(12px) scale(0.98); }
+}
 
+@keyframes detailIn { to { opacity: 1; transform: translateY(0); } }
+@keyframes dBarGrow { from { width: 0; } }
+
+.text-fade { animation: fadeSwap 0.3s ease-out; }
+.shake-animation { animation: shake 0.6s cubic-bezier(.36, .07, .19, .97) both !important; }
+
+/* =========================================
+   9. التجاوب (Responsive)
+========================================= */
 @media (min-width: 1200px) {
     .app-container { max-width: 1150px; }
 }
@@ -786,15 +926,16 @@ html { overflow-x: hidden; }
     .history-grid { grid-template-columns: 1fr; gap: 12px; }
     .course-card { padding: 12px 10px; }
     .course-main { display: grid; grid-template-columns: 38px 1fr 1fr 38px; gap: 8px; }
-    .btn-icon { width: 38px; height: 38px; }
-    .course-number-box { width: 38px; height: 38px; font-size: 0.9rem; }
-    select { font-size: 0.85rem; padding: 0 5px 0 25px !important; height: 38px; }
+    .course-number-box { font-size: 0.9rem; }
+    select { font-size: 0.85rem; padding: 0 5px 0 25px; height: 38px; }
     .course-options { flex-direction: column; align-items: flex-start; gap: 10px; }
     .old-grade-wrapper { width: 100%; justify-content: space-between; }
-    .old-grade-wrapper select { flex: 1; max-width: 65%; }
+    .old-grade-wrapper select { flex: 1; max-width: 65%; padding-left: 5px; }
     .gpa-value { font-size: 3.5rem; margin-bottom: 15px; }
     .stats-container { gap: 10px; flex-direction: column; align-items: stretch; }
-    .stat-badge { font-size: 0.9rem; padding: 10px 12px; justify-content: center; }
+    .stat-badge { padding: 10px 12px; justify-content: center; }
+    .bau-warn-toast { bottom: 95px; padding: 11px 14px 14px; gap: 10px; }
+    .warn-icon { width: 32px; height: 32px; }
 }
 
 @media (max-width: 380px) {
@@ -815,7 +956,7 @@ html { overflow-x: hidden; }
     .header { margin-bottom: 1rem; }
     .gpa-value { font-size: 2.75rem; margin-bottom: 8px; }
     .chart-wrapper { min-height: 160px; }
-    .history-container { margin-top: 10px; margin-bottom: 10px; padding: 10px 15px; }
+    .history-container { margin: 10px 0; padding: 10px 15px; }
 }
 
 /* منع الخلفية الثابتة على الأجهزة اللمسية (تحسين أداء التمرير) */
@@ -831,3 +972,138 @@ html { overflow-x: hidden; }
         transition-duration: 0.01ms !important;
     }
 }
+
+/* --- صف عنوان التتبع: الزر يميناً والنص أقصى اليسار --- */
+.history-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.history-title-row .history-title {
+    margin-bottom: 0;
+    text-align: right; /* النص أقصى اليمين */
+    font-size: 0.85rem;
+}
+
+/* زر "إضافة جميع الفصول": أخضر صلب ينتصر على خلفية القسم الأخضر، بنص أبيض */
+.history-btn {
+    font-family: 'Tajawal', sans-serif;
+    font-size: 0.74rem;
+    font-weight: 800;
+    color: #ffffff;
+    background: var(--primary);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 5px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.history-btn:hover {
+    background: #00874a; /* أخضر أفتح يواصل كسر الخلفية */
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.history-btn:active {
+    transform: translateY(0) scale(0.97);
+}
+
+/* --- نافذة فصول التتبع --- */
+.hist-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 42vh;
+    overflow-y: auto;
+    margin-bottom: 4px;
+    scrollbar-width: none;
+}
+.hist-list::-webkit-scrollbar { display: none; }
+
+.hist-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hist-num {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: rgba(243, 195, 0, 0.12);
+    color: var(--secondary);
+    border: 1px solid rgba(243, 195, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.hist-input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hist-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(0, 104, 56, 0.1);
+}
+
+.hist-del { width: 30px; height: 30px; }
+
+.hist-footer {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.btn-add-sm {
+    flex: 1;
+    padding: 9px;
+    background: transparent;
+    border: 2px dashed var(--border);
+    color: var(--text-muted);
+    border-radius: 10px;
+    font-family: 'Tajawal', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.btn-add-sm:hover { border-color: var(--primary); color: var(--primary); background: rgba(0, 104, 56, 0.05); }
+.btn-add-sm:active { transform: scale(0.98); }
+
+.btn-primary-sm {
+    padding: 9px 24px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-family: 'Tajawal', sans-serif;
+    font-weight: 800;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+.btn-primary-sm:hover { background: #00522c; }
+.btn-primary-sm:active { transform: scale(0.97); }
