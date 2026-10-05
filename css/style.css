@@ -362,9 +362,10 @@ select:focus {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 10px;
+    flex-wrap: wrap; /* كل عنصر (checkbox / صندوق الإعادة) يأخذ سطراً عند الحاجة */
+    gap: 8px;
     overflow: hidden;
-    max-height: 100px;
+    max-height: 160px;
     opacity: 1;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -382,6 +383,11 @@ select:focus {
 }
 .checkbox-label input { width: 14px; height: 14px; accent-color: var(--primary); }
 
+/* صف خيارات المعادة: محاذاة عمودية ثابتة ومنع تكسّر النصوص */
+.course-options { align-items: center; }
+.checkbox-label,
+.old-grade-label { white-space: nowrap; }
+
 .old-grade-wrapper {
     max-height: 0;
     opacity: 0;
@@ -392,9 +398,30 @@ select:focus {
     margin-top: 0;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.old-grade-wrapper.show { max-height: 60px; opacity: 1; margin-top: 5px; }
+/* صندوق الإعادة: سطر مستقل بكامل العرض — تقسيم واضح لبطاقة المادة */
+.old-grade-wrapper.show {
+    flex: 1 1 100%;
+    max-height: 100px;
+    opacity: 1;
+    margin-top: 2px;
+    background: rgba(243, 195, 0, 0.06);
+    border: 1px dashed rgba(243, 195, 0, 0.4);
+    border-radius: 10px;
+    padding: 8px 10px;
+    gap: 8px;
+}
+
+.old-grade-wrapper.show .old-grade-label {
+    color: var(--warn); /* التسمية تتوهج مع منطقة الإعادة */
+    font-weight: 700;
+}
 .old-grade-wrapper select { padding-left: 5px; background-image: none; }
-.old-grade-label { font-size: 0.7rem; color: var(--text-muted); }
+.old-grade-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    white-space: nowrap;   /* النص بسطر واحد — لا تكديس للكلمات */
+    flex-shrink: 0;        /* لا تنضغط أمام القائمة والشارة */
+}
 
 /* نبضة خفيفة على قائمة العلامات عند إعادة بناء خياراتها (تبديل 0 ساعة) */
 .select-pulse { animation: selectPulse 0.5s ease-out; }
@@ -1107,3 +1134,57 @@ select:focus {
 }
 .btn-primary-sm:hover { background: #00522c; }
 .btn-primary-sm:active { transform: scale(0.97); }
+
+/* --- شارة "أوزان قديمة" لطلاب 2023/2024 — بجانب قائمة العلامة السابقة --- */
+.old-grade-wrapper {
+    flex-wrap: nowrap;
+    gap: 6px;
+}
+
+.old-grade-wrapper .old-grade {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.old-weight-pill {
+    font-family: 'Tajawal', sans-serif;
+    font-size: 0.66rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    background: #ffffff;
+    border: 1px solid var(--border);
+    padding: 5px 11px;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.old-weight-pill:hover {
+    border-color: rgba(180, 83, 9, 0.45);
+    color: var(--warn);
+}
+
+.old-weight-pill:active {
+    transform: scale(0.95);
+}
+
+/* مفعَّلة: توهج كهرماني هادئ يميز نظام 2023/2024 */
+.old-weight-pill.active {
+    color: var(--warn);
+    background: rgba(180, 83, 9, 0.1);
+    border-color: rgba(180, 83, 9, 0.45);
+    box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.08);
+}
+
+.old-weight-pill:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* على الجوال: السماح بالتفاف أنيق إن ضاقت المساحة */
+@media (max-width: 380px) {
+    .old-grade-wrapper { flex-wrap: wrap; }
+    .old-weight-pill { padding: 4px 9px; }
+}
