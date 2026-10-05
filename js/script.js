@@ -45,6 +45,14 @@
         { v: '1.25', l: '(D)' }, { v: '1.00', l: '(رسوب) (-D)' }
     ];
 
+    // نظاما وزن المحاولة السابقة لمعادات C- فما دون — نفس الرموز، قيمتان حسب جيل الطالب:
+    // الحالية (2025+)          : C-=2.25 · D+=2.00 · D=1.25 · D-=1.00
+    // قديمة (دفعة 2023/2024)   : C-=1.75 · D+=1.50 · D=1.00 · D-=0.75
+    const OLD_GRADE_SYSTEMS = {
+        'new': [['2.25', '(-C)'], ['2.00', '(+D)'], ['1.25', '(D)'], ['1.00', '(رسوب) (-D)']],
+        'old': [['1.75', 'C-'], ['1.50', 'D+'], ['1.00', 'D'], ['0.75', '(رسوب) -D']]
+    };
+
     // تقديرات المعدل (من الأعلى للأدنى)
     const RATINGS = [
         [3.69, 'امتياز 🥇'], [3.00, 'جيد جداً 🥈'], [2.50, 'جيد 🥉'],
@@ -374,6 +382,27 @@
         select.value = opts.some(([v]) => v === selected) ? selected : '';
     }
 
+    // إعادة بناء قائمة "العلامة السابقة" حسب نظام الأوزان المختار،
+    // مع الحفاظ على الرمز المختار (C- يبقى C- مهما تبدل النظام)
+    function rebuildOldGradeSelect(card) {
+        const useOld = card.querySelector('.old-weight-pill').classList.contains('active');
+        const select = card.querySelector('.old-grade');
+        const currentVal = select.value;
+
+        // رمز الاختيار الحالي من أي نظام كان
+        let symbol = null;
+        for (const set of Object.values(OLD_GRADE_SYSTEMS)) {
+            const hit = set.find(([v]) => v === currentVal);
+            if (hit) { symbol = hit[1]; break; }
+        }
+
+        const opts = OLD_GRADE_SYSTEMS[useOld ? 'old' : 'new'];
+        select.replaceChildren(...opts.map(([v, l]) => new Option(l, v)));
+
+        const match = symbol ? opts.find(([, l]) => l === symbol) : null;
+        select.value = match ? match[0] : opts[opts.length - 1][0]; // الافتراضي: أدنى رمز (D-)
+    }
+
     // ضبط قيمة قائمة، مع الرجوع لقيمة افتراضية إن لم تكن ضمن الخيارات
     function setSelectValue(select, value, fallback) {
         select.value = value;
@@ -393,7 +422,9 @@
             grade: card.querySelector('.course-grade').value,
             // مادة الصفر ساعة لا يوجد لها خيار "مادة معادة"
             isRepeated: hours !== '0' && card.querySelector('.repeat-checkbox').checked,
-            oldGrade: card.querySelector('.old-grade').value
+            oldGrade: card.querySelector('.old-grade').value,
+            // نظام وزن المحاولة السابقة: قديم (2023/2024) أو حالي
+            oldSystem: card.querySelector('.old-weight-pill').classList.contains('active') ? 'old' : 'new'
         };
     }
 
@@ -407,7 +438,15 @@
 
         setSelectValue(card.querySelector('.course-hours'), hours, '3');
         fillGradeSelect(card.querySelector('.course-grade'), isZero, course ? course.grade : '');
-        setSelectValue(card.querySelector('.old-grade'), (course && course.oldGrade) || '1.00', '1.00');
+        // نظام الأوزان: من الحقول المحفوظة، أو استنتاجه من قيمة قديمة (1.75/1.50/0.75 = نظام قديم)
+        const savedOld = course && course.oldGrade;
+        const useOld = (course && course.oldSystem === 'old')
+            || (!!savedOld && ['1.75', '1.50', '0.75'].includes(savedOld));
+        const pill = card.querySelector('.old-weight-pill');
+        pill.classList.toggle('active', useOld);
+        pill.setAttribute('aria-pressed', String(useOld));
+        rebuildOldGradeSelect(card); // يبني خيارات النظام المختار أولاً
+        setSelectValue(card.querySelector('.old-grade'), savedOld || (useOld ? '0.75' : '1.00'), useOld ? '0.75' : '1.00');
 
         card.querySelector('.repeat-checkbox').checked = repeated;
         card.querySelector('.checkbox-label').hidden = isZero;
@@ -572,11 +611,13 @@
                 if (!c.isRepeated) {
                     finalTotalHours += hours;
                     gpaHours += hours;
-                } else if (oldGradeValue <= 1.00) {
-                    // معادة بعلامة رسوب سابقة: تُضاف للمقطوعة فقط (ساعات المعدل محتسبة سابقاً)
+                } else if (oldHours === 0) {
+                    // لا سجل سابق يُستبدل (طالب مستجد) ⇒ تُعامل كمادة جديدة بالكامل
                     finalTotalHours += hours;
-                    if (oldHours === 0) gpaHours += hours;
+                    gpaHours += hours;
                 }
+                // المعادة بأي علامة سابقة: لا تُضاف ساعات إطلاقاً — ساعاتها محتسبة
+                // في الساعات المقطوعة أصلاً، وإلا تُزداد عند تكرار مادتين أو أكثر
                 newSemesterPoints += hours * gradeValue;
                 newSemesterHours += hours;
                 if (c.isRepeated && oldHours > 0) {
@@ -617,8 +658,13 @@
         check(r.gpaHours, 79, 'ساعات المعدل بعد الإضافة');
 
         r = computeGPA(2.00, 60, [C(3, '3.00', true, '1.00')]);
-        check(r.finalTotalHours, 63, 'المعادة بالرسوب ترفع المقطوعة');
+        check(r.finalTotalHours, 60, 'المعادة بالرسوب لا تضيف ساعات مقطوعة');
         check(r.gpaHours, 60, 'ساعات المعدل ثابتة للمعادة بالرسوب');
+
+        // انحدار سابق: مادتان معادتان بالرسوب كانت تزيدان الساعات — يجب ألا يحدث الآن
+        r = computeGPA(2.00, 60, [C(3, '3.00', true, '1.00'), C(3, '4.00', true, '1.00')]);
+        check(r.finalTotalHours, 60, 'مادتان معادتان: الساعات لا تزيد أبداً');
+        check(r.finalGpa, (120 - 6 + 21) / 60, 'نقاط المادتين المعادتين تُستبدلان صح');
 
         r = computeGPA(2.00, 60, [C(3, '3.00', true, '1.25')]);
         check(r.finalTotalHours, 60, 'المعادة بـ D لا تضيف ساعات مقطوعة');
@@ -857,7 +903,7 @@
             const chipText = stable ? '✅ مستقر' : dMax <= 0.30 ? '⏳ استقرار جزئي' : '⚡ لم يستقر بعد';
             const caption = stable
                 ? `حتى لو أتممت المتبقي كله بعلامات كاملة، لن يرتفع معدلك أكثر من +${dMax.toFixed(2)} — معدلك شبه مثبت`
-                : `لو أنجزت كل ساعاتك المتبقية (${remainPlan} ساعة) بعلامة كاملة (A)، فهذا أقصى ما سيصعد إليه معدلك`;
+                : `لو أنجزت كل ساعاتك المتبقية (${remainPlan} سا) بعلامة كاملة (A)، فهذا أقصى ما سيصعد إليه معدلك`;
             const bar = h('div', 'stab-hero-bar', h('span'));
             bar.style.setProperty('--pct', `${completion}%`);
 
@@ -869,7 +915,22 @@
                     bar,
                     h('div', 'stab-hero-cap', caption))));
 
-            // (2) النقاط نحو الهدف: المحققة فعلاً ÷ المطلوبة (مؤشر تقدم ملموس)
+            // (2) نقطة التعادل: فصلي ≥ التراكمي يرفعه، وأقل ينزله — الهدف الدنيا لكل فصل
+            {
+                const breakEvenRows = [
+                    row('', span('', 'معدل فصلي'), counter(G, { cls: 'tone-primary' }), span('', 'أو أكثر يرفع تراكمك ▲'))
+                ];
+                if (f.newSemHours > 0 && f.semesterGpa > 0) {
+                    const above = f.semesterGpa >= G;
+                    breakEvenRows.push(row(above ? 'effect-row--ok' : 'effect-row--strong',
+                        span('', 'فصلك الحالي'),
+                        span(above ? 'is-up' : 'is-down', f.semesterGpa.toFixed(2)),
+                        span(above ? 'tone-primary' : 'tone-strong', above ? 'فوق التعادل ✓' : 'تحت التعادل — ارفعه ⚠')));
+                }
+                parts.push(item('icon-clock', 'نقطة التعادل', ...breakEvenRows));
+            }
+
+            // (3) النقاط نحو الهدف: المحققة فعلاً ÷ المطلوبة (مؤشر تقدم ملموس)
             if (planTarget > 0) {
                 const earnedPts = G * H;                  // نقاطك الحقيقية المحتسبة
                 const neededPts = planTarget * planTotal; // نقاط الهدف
@@ -889,7 +950,7 @@
                             : `حققت ${ptsPct}% من نقاط هدفك — تبقى ${Math.round(neededPts - earnedPts)} نقطة`))));
             }
 
-            // (3) متى يستقر؟  Hc ≥ Ht × (1 − δ/(4−G))
+            // (4) متى يستقر؟  Hc ≥ Ht × (1 − δ/(4−G))
             if (stable) {
                 parts.push(item('icon-clock', 'متى يستقر معدلي؟',
                     row('effect-row--ok', span('', '✅ معدلك مستقر الآن فعلاً'), span('tone-primary', `سقف تحسنه ≤ ${CONFIG.STABLE_DELTA.toFixed(2)}`))));
@@ -903,7 +964,7 @@
                     row('', span('', 'أي بعد'), span('', counter(remainStable, { float: false }), ` ساعة إضافية${semText}`))));
             }
 
-            // (4) سقفا الصعود والهبوط
+            // (5) سقفا الصعود والهبوط
             parts.push(item('icon-pie', 'سقفا التغيّر المتبقيين',
                 row('', span('', 'أقصى صعود (A بكل المتبقي)'), counter(dMax, { prefix: '+', cls: 'is-up' })),
                 row('', span('', 'أقصى هبوط (رسوب بكل المتبقي)'), counter(dMin, { prefix: '−', cls: 'is-down' }))));
@@ -919,14 +980,14 @@
             const [tone, label] = abs >= 0.15 ? ['strong', '⚡ تأثير كبير']
                 : abs >= 0.05 ? ['medium', 'تأثير متوسط']
                 : ['light', '🪶 تأثير بسيط'];
-            parts.push(item('icon-history', 'أثر العلامات على المعدل',
+            parts.push(item('icon-history', 'أثر ما أدخلته الآن',
                 row(`effect-row--${tone}`,
                     span('', 'الفرق على تراكميك'),
                     counter(impact, { prefix: impact >= 0 ? '+' : '', cls: `d-val--lg ${impact >= 0 ? 'is-up' : 'is-down'}` }),
                     span(`tone-${tone}`, label))));
         }
 
-        // (5) قراءة التاريخ المسجل: الاتجاه + توقع التخرج + التذبذب
+        // (6) قراءة التاريخ المسجل: الاتجاه + توقع التخرج + التذبذب
         // يستفيد من gpaHistory التي يملؤها الترحيل التلقائي أو نافذة "إضافة جميع الفصول"
         const hist = (AppState.gpaHistory || []).filter(v => !isNaN(v));
         if (hist.length >= 2) {
@@ -968,13 +1029,13 @@
             parts.push(item('icon-cap', `قراءة تاريخك (${n} ${pluralize(n, ['فصل', 'فصلين', 'فصول', 'فصل'])})`, ...rows));
         }
 
-        // (6) أثر مادة واحدة (3 ساعات)
+        // (7) أثر مادة واحدة (3 ساعات)
         // (7) أثر مادة واحدة (3 ساعات)
         parts.push(item('icon-book', 'لو أضفت مادة 3 ساعات الآن',
             row('', span('grade-tag grade-tag--best', 'A كاملة'), span('', 'ستغيّر تراكميك'), counter(eff(4), { prefix: '+', cls: 'is-up' })),
             row('', span('grade-tag grade-tag--worst', 'رسوب (-D)'), span('', 'ستغيّر تراكميك'), counter(eff(1), { cls: 'is-down' }))));
 
-        // (8) القاعدة الختامية
+        // (9) القاعدة الختامية
         const rule = tpl('rule');
         rule.querySelector('.rule-delta').textContent = CONFIG.STABLE_DELTA.toFixed(2);
         rule.classList.add('detail-item');
@@ -1245,7 +1306,15 @@ function updateChart(oldGpa, finalGpa) {
         // ---- المواد (تفويض أحداث) ----
         DOM.coursesContainer.addEventListener('click', (e) => {
             const del = e.target.closest('.delete-btn');
-            if (del) removeCourse(del);
+            if (del) { removeCourse(del); return; }
+            const pill = e.target.closest('.old-weight-pill');
+            if (pill) {
+                const card = pill.closest('.course-card');
+                const active = pill.classList.toggle('active');
+                pill.setAttribute('aria-pressed', String(active));
+                rebuildOldGradeSelect(card);
+                debouncedCalculateAndSave();
+            }
         });
 
         DOM.coursesContainer.addEventListener('change', (e) => {
