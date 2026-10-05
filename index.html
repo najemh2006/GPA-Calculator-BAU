@@ -138,7 +138,7 @@
 
             <div class="history-container">
                 <div class="history-title-row">
-                    <div class="history-title">تتبع التطور (اختياري) - أدخل آخر معدلين تراكميين </div>
+                    <div class="history-title">تتبع التطور (اختياري) - أدخل آخر معدلين تراكميين</div>
                     <button id="historyBtn" class="history-btn" type="button">إضافة جميع الفصول</button>
                 </div>
                 <div class="history-grid">
@@ -158,7 +158,7 @@
         <div class="bau-modal-backdrop" id="detailsBackdrop"></div>
         <div class="bau-modal-card">
             <div class="bau-modal-header">
-                <h3>📊 تفاصيل استقرار المعدل</h3>
+                <h3>📊 تفاصيل المعدل</h3>
                 <button id="detailsCloseBtn" class="bau-modal-close" type="button" aria-label="إغلاق">✕</button>
             </div>
             <div id="detailsBody" class="bau-modal-body"></div>
@@ -170,7 +170,7 @@
         <div class="bau-modal-backdrop" id="historyBackdrop"></div>
         <div class="bau-modal-card bau-modal-card--history">
             <div class="bau-modal-header">
-                <h3>📈 تتبع المعدل التّراكمي</h3>
+                <h3>📈 المعدلات السابقة </h3>
                 <button id="historyCloseBtn" class="bau-modal-close" type="button" aria-label="إغلاق">✕</button>
             </div>
             <div id="historyList" class="hist-list"></div>
@@ -237,6 +237,9 @@
                         <option value="1.25">(D)</option>
                         <option value="1.00">(رسوب) (-D)</option>
                     </select>
+                    <!-- شارة أوزان 2023/2024: نفس الرموز بقيم أقدم (C-=1.75, D+=1.50, D=1.00, D-=0.75) -->
+                    <button type="button" class="old-weight-pill" title="لطلاب دفعة 2023/2024 — الأوزان قبل التعديل"
+                        aria-pressed="false">الأوزان القديمة</button>
                 </div>
             </div>
         </div>
