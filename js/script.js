@@ -2,17 +2,6 @@
 
 /*
  * حاسبة المعدل التراكمي — جامعة البلقاء التطبيقية
- * -----------------------------------------------
- * تقسيم المسؤوليات:
- *   index.html : الهيكل (وقوالب <template> التي تُستنسخ هنا)
- *   style.css  : كل التنسيق والحركات (keyframes) وحالات العرض
- *   script.js  : السلوك فقط — يبدّل الكلاسات ويضبط متغيرات CSS ويملأ البيانات
- *
- * الأقسام:
- *   1. الثوابت والبيانات   2. الحالة والعناصر   3. أدوات مساعدة
- *   4. التخزين والحفظ      5. المواد الدراسية   6. الإشعارات (تراجع/تحذير)
- *   7. الحساب النقي        8. عرض النتائج       9. نافذة التفاصيل
- *  10. الرسم البياني والاحتفال   11. الأحداث والتشغيل
  */
 (() => {
 
@@ -26,18 +15,21 @@
         SAVE_REFRESH_MS: 10000,
         CALC_DEBOUNCE_MS: 150,
         GRADE_MAX: 4,
-        MIN_GPA: 2.00,            // الحد الأدنى للمعدل
-        MAX_COURSES: 12,          // أقصى عدد مواد منطقي في الفصل
+        MIN_GPA: 2.00,
+        MAX_COURSES: 12,
         DEFAULT_COURSES: 4,
-        MAX_HISTORY: 6,           // أقصى عدد فصول يُحفظ من الترحيل التلقائي
-        MAX_TRACKED: 12,          // أقصى عدد فصول في نافذة تتبع التطور اليدوية
-        STABLE_DELTA: 0.10,       // عتبة الاستقرار: سقف التحسن المتبقي
-        REPEAT_GREAT: 0.10,       // ربحية إعادة المادة: ممتازة لرفع المعدل
-        REPEAT_WORTH: 0.05,       // ربحية إعادة المادة: مجدية
-        SEMESTER_HOURS: 15        // تقدير الساعات في الفصل (لنافذة التفاصيل)
+        MAX_HISTORY: 6,
+        MAX_TRACKED: 12,
+        STABLE_DELTA: 0.10,
+        SEMESTER_HOURS: 15
     };
 
-    // مصدر واحد للعلامات — تُبنى منه قوائم الخيارات
+    const Store = {
+        get: (key) => { try { return localStorage.getItem(key); } catch(e) { return null; } },
+        set: (key, val) => { try { localStorage.setItem(key, val); return true; } catch(e) { return false; } },
+        remove: (key) => { try { localStorage.removeItem(key); } catch(e) {} }
+    };
+
     const GRADES = [
         { v: '4.00', l: 'A' }, { v: '3.75', l: '-A' }, { v: '3.50', l: '+B' },
         { v: '3.25', l: '(B)' }, { v: '3.00', l: '(-B)' }, { v: '2.75', l: '(+C)' },
@@ -45,21 +37,16 @@
         { v: '1.25', l: '(D)' }, { v: '1.00', l: '(رسوب) (-D)' }
     ];
 
-    // نظاما وزن المحاولة السابقة لمعادات C فما دون — نفس الرموز، قيمتان حسب جيل الطالب:
-    // الحالية (2025+)          : C=2.50 · C-=2.25 · D+=2.00 · D=1.25 · D-=1.00
-    // قديمة (دفعة 2023/2024)   : C=2.50 · C-=1.75 · D+=1.50 · D=1.00 · D-=0.75
     const OLD_GRADE_SYSTEMS = {
         'new': [['2.50', '(C)'], ['2.25', '(-C)'], ['2.00', '(+D)'], ['1.25', '(D)'], ['1.00', '(رسوب) (-D)']],
-        'old': [['2.50', 'C'], ['1.75', 'C-'], ['1.50', 'D+'], ['1.00', 'D'], ['0.75', '(رسوب) -D']]
+        'old': [['2.00', 'C'], ['1.75', '-C'], ['1.50', '+D'], ['1.00', 'D'], ['0.75', '(رسوب) -D']]
     };
 
-    // تقديرات المعدل (من الأعلى للأدنى)
     const RATINGS = [
         [3.69, 'امتياز 🥇'], [3.00, 'جيد جداً 🥈'], [2.50, 'جيد 🥉'],
         [2.00, 'مقبول 👍'], [-Infinity, 'ضعيف ⚠️']
     ];
 
-    // وحدات الوقت لمؤشر الحفظ (الأكبر أولاً) — صيغ الجمع العربية: مفرد، مثنى، جمع قلة، جمع كثرة
     const TIME_UNITS = [
         { secs: 86400, forms: ['يوم', 'يومين', 'أيام', 'يوم'] },
         { secs: 3600, forms: ['ساعة', 'ساعتين', 'ساعات', 'ساعة'] },
@@ -76,8 +63,8 @@
         hasCelebrated: false,
         isWarningState: false,
         confettiPromise: null,
-        undoAction: null,          // دالة التراجع الحالية (حذف مادة أو ترحيل فصل)
-        gpaHistory: [],            // سجل المعدلات التلقائي: الأقدم ← الأحدث
+        undoAction: null,
+        gpaHistory: [],
         undoToastTimeout: null,
         undoInterval: null,
         undoCountReset: null,
@@ -86,9 +73,9 @@
         timeUpdateInterval: null,
         lastChartDataString: '',
         currentTimestamp: null,
-        lastComputed: { gpa: 0, hours: 0, semHours: 0 }, // للترحيل بدل قراءة أرقام أثناء أنيميشنها
-        lastFull: null,            // نسخة موسعة لنافذة التفاصيل
-        animFrames: new WeakMap()  // يمنع تراكب حركتين على نفس العنصر
+        lastComputed: { gpa: 0, hours: 0, semHours: 0 },
+        lastFull: null,
+        animFrames: new WeakMap()
     };
 
     const DOM = {};
@@ -101,7 +88,10 @@
             'undoToast', 'undoMsg', 'undoTimerText', 'saveStatusText',
             'warnToast', 'warnMsg', 'detailsModal', 'detailsBody',
             'historyModal', 'historyList',
-            'courseTemplate', 'noteTemplates', 'detailTemplates'
+            'courseTemplate', 'noteTemplates', 'detailTemplates',
+            'resetBtn', 'addCourseBtn', 'nextSemesterBtn', 'undoBtn', 'detailsBtn',
+            'detailsCloseBtn', 'detailsBackdrop', 'historyBtn', 'historyCloseBtn',
+            'historyBackdrop', 'historyAddBtn', 'historySaveBtn'
         ];
         ids.forEach(id => { DOM[id] = document.getElementById(id); });
     }
@@ -117,21 +107,18 @@
         };
     }
 
-    // إعادة تشغيل حركة CSS: إزالة الكلاس ثم إضافته بعد reflow
     function retriggerAnimation(el, className) {
         el.classList.remove(className);
         void el.offsetWidth;
         el.classList.add(className);
     }
 
-    // صيغة الجمع العربية: 1، 2، 3-10، 11+
     function pluralize(count, [one, two, few, many]) {
         if (count === 1) return one;
         if (count === 2) return two;
         return (count >= 3 && count <= 10) ? few : many;
     }
 
-    // بناة DOM صغيرة (بديل عن قوالب النصوص HTML داخل JS)
     const h = (tag, cls = '', ...kids) => {
         const el = document.createElement(tag);
         if (cls) el.className = cls;
@@ -148,10 +135,8 @@
         return svg;
     };
 
-    // استنساخ جزء من <template> بحسب محدد
     const fromTemplate = (tpl, selector) => tpl.content.querySelector(selector).cloneNode(true);
 
-    // عدّاد أرقام متحرك: يحرّكه animateValue لاحقاً
     const counter = (target, { prefix = '', float = true, cls = '' } = {}) => {
         const el = h('span', `d-val ${cls}`.trim(), prefix + (float ? '0.00' : '0'));
         el.dataset.target = target;
@@ -160,7 +145,6 @@
         return el;
     };
 
-    // حركة عدّاد رقمي — تلغي أي حركة سابقة على نفس العنصر
     function animateValue(obj, start, end, duration, isFloat = false, prefix = '', suffix = '') {
         const previous = AppState.animFrames.get(obj);
         if (previous) cancelAnimationFrame(previous);
@@ -184,11 +168,12 @@
         AppState.animFrames.set(obj, requestAnimationFrame(step));
     }
 
-    // تنسيق حقول المعدل تلقائياً: رقم.رقمان، وأقصى قيمة 4.00
     function formatGpaInput(event) {
-        if (event.inputType === 'deleteContentBackward') return;
+        if (event.inputType && event.inputType.startsWith('delete')) return;
         const input = event.target;
-        const value = input.value.replace(/[^0-9]/g, '');
+        let raw = input.value.replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 1632));
+        const value = raw.replace(/[^0-9]/g, '');
+
         if (!value) { input.value = ''; return; }
 
         let first = value.charAt(0);
@@ -217,11 +202,7 @@
 
     function saveUserData(data) {
         const task = () => {
-            try {
-                localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(data));
-            } catch (e) {
-                console.warn('تعذر حفظ البيانات محلياً:', e);
-            }
+            Store.set(CONFIG.STORAGE_KEY, JSON.stringify(data));
             updateSaveIndicator();
         };
         if ('requestIdleCallback' in window) requestIdleCallback(task);
@@ -234,18 +215,17 @@
     }
 
     function loadData() {
+        const raw = Store.get(CONFIG.STORAGE_KEY);
+        if (!raw) {
+            stampNow();
+            addDefaultCourses();
+            initChart(['المعدل الحالي', 'المعدل الجديد'], [0, 0], 0, 4);
+            calculateGPA(false);
+            return;
+        }
+
         try {
-            const raw = localStorage.getItem(CONFIG.STORAGE_KEY);
-            if (!raw) {
-                stampNow();
-                addDefaultCourses();
-                initChart(['المعدل الحالي', 'المعدل الجديد'], [0, 0], 0, 4);
-                calculateGPA(false);
-                return;
-            }
-
             const saved = JSON.parse(raw);
-
             if (saved.timestamp) {
                 AppState.currentTimestamp = saved.timestamp;
                 AppState.lastSaveTime = new Date(saved.timestamp);
@@ -254,7 +234,6 @@
             }
             updateSaveIndicator();
 
-            // سجل التطور التلقائي (مع تنقية القيم غير الصالحة)
             AppState.gpaHistory = Array.isArray(saved.gpaHistory)
                 ? saved.gpaHistory.map(parseFloat).filter(v => !isNaN(v) && v >= 0 && v <= CONFIG.GRADE_MAX)
                 : [];
@@ -275,14 +254,15 @@
                     grade: c.grade || '',
                     hours: c.hours || '3',
                     isRepeated: !!c.isRepeated,
-                    oldGrade: c.oldGrade || '1.00'
+                    oldGrade: c.oldGrade || '1.00',
+                    oldSystem: c.oldSystem || 'new'
                 })));
             } else {
                 addDefaultCourses();
             }
         } catch (error) {
-            console.warn('تعذرت قراءة البيانات المحفوظة، سيتم البدء من جديد:', error);
-            localStorage.removeItem(CONFIG.STORAGE_KEY);
+            console.warn('تعذرت قراءة البيانات المحفوظة:', error);
+            Store.remove(CONFIG.STORAGE_KEY);
             addDefaultCourses();
         }
         initChart(['المعدل الحالي', 'المعدل الجديد'], [0, 0], 0, 4);
@@ -291,7 +271,6 @@
 
     function resetCalculator() {
         if (!confirm('هل أنت متأكد من رغبتك في تفريغ جميع البيانات وحذف المواد الحالية؟')) return;
-        localStorage.removeItem(CONFIG.STORAGE_KEY);
         AppState.gpaHistory = [];
         [DOM.oldGpa, DOM.oldHours, DOM.planTotal, DOM.planTarget, DOM.hist1, DOM.hist2].forEach(i => { i.value = ''; });
         addDefaultCourses();
@@ -310,7 +289,6 @@
             return;
         }
 
-        // منع الترحيل المزدوج: النتيجة مطابقة لما هو مسجل أصلاً
         const curGpa = parseFloat(DOM.oldGpa.value) || 0;
         const curHours = parseInt(DOM.oldHours.value, 10) || 0;
         if (Math.abs(computed.gpa - curGpa) < 0.005 && computed.hours === curHours) {
@@ -318,12 +296,11 @@
             return;
         }
 
-        if (!confirm('هل تريد ترحيل هذا المعدل ليكون معدلك الحالي، والبدء بفصل جديد؟ \n(سيتم حفظ معدلك الحالي في سجل التطور تلقائياً، ويمكنك التراجع خلال 5 ثوانٍ)')) return;
+        if (!confirm('هل تريد ترحيل هذا المعدل ليكون معدلك الحالي، والبدء بفصل جديد؟')) return;
 
         const prevGpaVal = DOM.oldGpa.value;
         const prevHist2 = DOM.hist2.value;
 
-        // لقطة كاملة للحالة تتيح التراجع
         const snapshot = {
             oldGpa: prevGpaVal,
             oldHours: DOM.oldHours.value,
@@ -334,7 +311,6 @@
             courses: readAllCourses()
         };
 
-        // حفظ المعدل الحالي في سجل التطور التلقائي
         const prevNum = parseFloat(prevGpaVal);
         if (!isNaN(prevNum) && prevNum > 0) {
             AppState.gpaHistory.push(prevNum);
@@ -347,7 +323,7 @@
         DOM.oldGpa.value = computed.gpa.toFixed(2);
         DOM.oldHours.value = computed.hours;
         addDefaultCourses();
-        AppState.hasCelebrated = computed.gpa >= 3.00; // لا احتفال مباشر بعد الترحيل
+        AppState.hasCelebrated = computed.gpa >= 3.00;
         AppState.isWarningState = false;
         DOM.appContainer.classList.remove('shake-animation');
         calculateGPA(true);
@@ -367,8 +343,6 @@
     // ==========================================
     // 5. المواد الدراسية
     // ==========================================
-
-    // تعبئة قائمة العلامة (العادية أو ناجح/راسب لمادة 0 ساعة) من المصدر الواحد GRADES
     function fillGradeSelect(select, isZeroHours, selected = '') {
         const opts = isZeroHours
             ? [['', 'اختر النتيجة'], ['pass', 'ناجح'], ['fail', 'راسب']]
@@ -382,28 +356,16 @@
         select.value = opts.some(([v]) => v === selected) ? selected : '';
     }
 
-    // إعادة بناء قائمة "العلامة السابقة" حسب نظام الأوزان المختار،
-    // مع الحفاظ على الرمز المختار (C- يبقى C- مهما تبدل النظام)
     function rebuildOldGradeSelect(card) {
         const useOld = card.querySelector('.old-weight-pill').classList.contains('active');
         const select = card.querySelector('.old-grade');
-        const currentVal = select.value;
-
-        // رمز الاختيار الحالي من أي نظام كان
-        let symbol = null;
-        for (const set of Object.values(OLD_GRADE_SYSTEMS)) {
-            const hit = set.find(([v]) => v === currentVal);
-            if (hit) { symbol = hit[1]; break; }
-        }
-
         const opts = OLD_GRADE_SYSTEMS[useOld ? 'old' : 'new'];
-        select.replaceChildren(...opts.map(([v, l]) => new Option(l, v)));
+        const currentIdx = select.selectedIndex;
 
-        const match = symbol ? opts.find(([, l]) => l === symbol) : null;
-        select.value = match ? match[0] : opts[opts.length - 1][0]; // الافتراضي: أدنى رمز (D-)
+        select.replaceChildren(...opts.map(([v, l]) => new Option(l, v)));
+        select.selectedIndex = Math.max(0, Math.min(currentIdx > -1 ? currentIdx : opts.length - 1, opts.length - 1));
     }
 
-    // ضبط قيمة قائمة، مع الرجوع لقيمة افتراضية إن لم تكن ضمن الخيارات
     function setSelectValue(select, value, fallback) {
         select.value = value;
         if (select.selectedIndex < 0) select.value = fallback;
@@ -414,16 +376,13 @@
         checkbox.closest('.course-card').classList.toggle('repeated', checkbox.checked);
     }
 
-    // قراءة حالة بطاقة مادة (مصدر واحد للحفظ والحساب واللقطات)
     function readCourse(card) {
         const hours = card.querySelector('.course-hours').value;
         return {
             hours,
             grade: card.querySelector('.course-grade').value,
-            // مادة الصفر ساعة لا يوجد لها خيار "مادة معادة"
             isRepeated: hours !== '0' && card.querySelector('.repeat-checkbox').checked,
             oldGrade: card.querySelector('.old-grade').value,
-            // نظام وزن المحاولة السابقة: قديم (2023/2024) أو حالي
             oldSystem: card.querySelector('.old-weight-pill').classList.contains('active') ? 'old' : 'new'
         };
     }
@@ -438,20 +397,21 @@
 
         setSelectValue(card.querySelector('.course-hours'), hours, '3');
         fillGradeSelect(card.querySelector('.course-grade'), isZero, course ? course.grade : '');
-        // نظام الأوزان: من الحقول المحفوظة، أو استنتاجه من قيمة قديمة (1.75/1.50/0.75 = نظام قديم)
+
         const savedOld = course && course.oldGrade;
         const useOld = (course && course.oldSystem === 'old')
             || (!!savedOld && ['1.75', '1.50', '0.75'].includes(savedOld));
+
         const pill = card.querySelector('.old-weight-pill');
         pill.classList.toggle('active', useOld);
         pill.setAttribute('aria-pressed', String(useOld));
-        rebuildOldGradeSelect(card); // يبني خيارات النظام المختار أولاً
+        rebuildOldGradeSelect(card);
         setSelectValue(card.querySelector('.old-grade'), savedOld || (useOld ? '0.75' : '1.00'), useOld ? '0.75' : '1.00');
 
-        card.querySelector('.repeat-checkbox').checked = repeated;
+        const repeatBox = card.querySelector('.repeat-checkbox');
+        repeatBox.checked = repeated;
+        toggleRepeat(repeatBox);
         card.querySelector('.checkbox-label').hidden = isZero;
-        card.querySelector('.old-grade-wrapper').classList.toggle('show', repeated);
-        card.classList.toggle('repeated', repeated);
         return card;
     }
 
@@ -482,21 +442,21 @@
 
     function removeCourse(button) {
         const card = button.closest('.course-card');
-        const cards = Array.from(DOM.coursesContainer.querySelectorAll('.course-card'));
+        const cards = Array.from(DOM.coursesContainer.querySelectorAll('.course-card:not(.removing)'));
 
-        if (cards.length <= 1) {
+        if (cards.length <= 1 || card.classList.contains('removing')) {
             alert('يجب إبقاء مادة واحدة على الأقل في الجدول.');
             return;
         }
 
-        const deleted = { ...readCourse(card), index: cards.indexOf(card) };
+        const allCards = Array.from(DOM.coursesContainer.querySelectorAll('.course-card'));
+        const deleted = { ...readCourse(card), index: allCards.indexOf(card) };
         card.classList.add('removing');
 
         setTimeout(() => {
             card.remove();
             updateCourseNumbers();
             debouncedCalculateAndSave();
-            // التراجع يُعيد المادة إلى مكانها الأصلي
             showUndoToast('تم حذف المادة', () => {
                 const restored = createCourseElement(deleted);
                 const ref = DOM.coursesContainer.children[deleted.index];
@@ -507,7 +467,6 @@
         }, 250);
     }
 
-    // تغيير عدد الساعات: إعادة بناء قائمة العلامات وإخفاء "معادة" عند 0 ساعة
     function onHoursChange(select) {
         const card = select.closest('.course-card');
         const gradeSelect = card.querySelector('.course-grade');
@@ -515,7 +474,11 @@
         const repeatBox = card.querySelector('.repeat-checkbox');
         const isZero = select.value === '0';
 
-        fillGradeSelect(gradeSelect, isZero);
+        if (gradeSelect.dataset.zero !== String(isZero)) {
+            fillGradeSelect(gradeSelect, isZero, gradeSelect.value);
+            gradeSelect.dataset.zero = isZero;
+        }
+
         repeatLabel.hidden = isZero;
         if (isZero && repeatBox.checked) {
             repeatBox.checked = false;
@@ -533,7 +496,6 @@
         AppState.undoAction = action;
         toast.classList.add('show');
 
-        // إعادة تشغيل العدّاد الدائري (تنسيقه في CSS)
         clearTimeout(AppState.undoCountReset);
         toast.classList.remove('is-counting');
         void toast.offsetWidth;
@@ -555,7 +517,6 @@
         DOM.undoToast.classList.remove('show');
         AppState.undoAction = null;
         clearInterval(AppState.undoInterval);
-        // نُبقي العدّاد حتى ينتهي انزلاق الإشعار للخارج
         clearTimeout(AppState.undoCountReset);
         AppState.undoCountReset = setTimeout(() => DOM.undoToast.classList.remove('is-counting'), 400);
     }
@@ -572,7 +533,7 @@
         const toast = DOM.warnToast;
         DOM.warnMsg.textContent = message;
         toast.classList.remove('hide', 'show');
-        void toast.offsetWidth; // إعادة تشغيل حركة الدخول وشريط العدّاد
+        void toast.offsetWidth;
         toast.classList.add('show');
         clearTimeout(AppState.warnTimeout);
         AppState.warnTimeout = setTimeout(hideWarnBanner, CONFIG.WARN_MS);
@@ -586,9 +547,8 @@
     }
 
     // ==========================================
-    // 7. الحساب النقي (لا يمس DOM)
+    // 7. الحساب النقي
     // ==========================================
-    // courses: [{hours, grade, isRepeated, oldGrade}]
     function computeGPA(oldGpa, oldHours, courses) {
         let oldTotalPoints = oldGpa * oldHours;
         let finalTotalHours = oldHours;
@@ -603,21 +563,13 @@
 
             if (grade === 'pass') {
                 if (!c.isRepeated) finalTotalHours += hours;
-            } else if (grade === 'fail') {
-                // راسب بلا علامة رقمية: لا ساعات ولا نقاط
-            } else if (grade !== '') {
+            } else if (grade !== '' && grade !== 'fail') {
                 const gradeValue = parseFloat(grade) || 0;
                 const oldGradeValue = parseFloat(c.oldGrade) || 0;
-                if (!c.isRepeated) {
-                    finalTotalHours += hours;
-                    gpaHours += hours;
-                } else if (oldHours === 0) {
-                    // لا سجل سابق يُستبدل (طالب مستجد) ⇒ تُعامل كمادة جديدة بالكامل
+                if (!c.isRepeated || oldHours === 0) {
                     finalTotalHours += hours;
                     gpaHours += hours;
                 }
-                // المعادة بأي علامة سابقة: لا تُضاف ساعات إطلاقاً — ساعاتها محتسبة
-                // في الساعات المقطوعة أصلاً، وإلا تُزداد عند تكرار مادتين أو أكثر
                 newSemesterPoints += hours * gradeValue;
                 newSemesterHours += hours;
                 if (c.isRepeated && oldHours > 0) {
@@ -630,7 +582,6 @@
         return {
             semesterGpa: newSemesterHours > 0 ? newSemesterPoints / newSemesterHours : 0,
             finalGpa: gpaHours > 0 ? finalTotalPoints / gpaHours : 0,
-            finalTotalPoints,
             finalTotalHours,
             gpaHours,
             newSemesterHours,
@@ -638,70 +589,17 @@
         };
     }
 
-    // اختبارات ذاتية للمنطق النقي — من كونسول المتصفح: runSelfTests()
-    function runSelfTests() {
-        let pass = 0, total = 0;
-        const check = (actual, expected, name) => {
-            total++;
-            const ok = Math.abs(actual - expected) < 0.005;
-            if (ok) pass++;
-            console.log(`${ok ? '✅' : '❌'} ${name}${ok ? '' : ` — الناتج ${actual} والمتوقع ${expected}`}`);
-        };
-        const C = (hours, grade, isRepeated = false, oldGrade = '1.00') => ({ hours, grade, isRepeated, oldGrade });
-
-        let r = computeGPA(2.86, 76, []);
-        check(r.finalGpa, 2.86, 'ثبات المعدل بدون مواد');
-        check(r.finalTotalHours, 76, 'الساعات بدون مواد');
-
-        r = computeGPA(2.86, 76, [C(3, '4.00')]);
-        check(r.finalGpa, (2.86 * 76 + 12) / 79, 'إضافة A بـ 3 ساعات');
-        check(r.gpaHours, 79, 'ساعات المعدل بعد الإضافة');
-
-        r = computeGPA(2.00, 60, [C(3, '3.00', true, '1.00')]);
-        check(r.finalTotalHours, 60, 'المعادة بالرسوب لا تضيف ساعات مقطوعة');
-        check(r.gpaHours, 60, 'ساعات المعدل ثابتة للمعادة بالرسوب');
-
-        // انحدار سابق: مادتان معادتان بالرسوب كانت تزيدان الساعات — يجب ألا يحدث الآن
-        r = computeGPA(2.00, 60, [C(3, '3.00', true, '1.00'), C(3, '4.00', true, '1.00')]);
-        check(r.finalTotalHours, 60, 'مادتان معادتان: الساعات لا تزيد أبداً');
-        check(r.finalGpa, (120 - 6 + 21) / 60, 'نقاط المادتين المعادتين تُستبدلان صح');
-
-        r = computeGPA(2.00, 60, [C(3, '3.00', true, '1.25')]);
-        check(r.finalTotalHours, 60, 'المعادة بـ D لا تضيف ساعات مقطوعة');
-
-        r = computeGPA(0, 0, [C(3, '3.50', true, '1.00')]);
-        check(r.finalGpa, 3.50, 'مستجد + معادة: لا نقاط سالبة');
-        check(r.finalTotalPoints >= 0 ? 1 : 0, 1, 'النقاط التراكمية غير سالبة');
-
-        r = computeGPA(2.50, 30, [C(3, 'pass')]);
-        check(r.finalTotalHours, 33, '"ناجح" يضيف للمقطوعة');
-        check(r.gpaHours, 30, '"ناجح" لا يدخل المعدل');
-
-        r = computeGPA(2.50, 30, [C(3, 'fail')]);
-        check(r.finalTotalHours, 30, '"راسب" لا يضيف ساعات');
-
-        r = computeGPA(2.50, 30, [C(3, ''), C(3, '4.00')]);
-        check(r.registeredSemesterHours, 3, 'ساعات الفصل للمقيّمة فقط');
-
-        console.log(`\nالنتيجة النهائية: ${pass}/${total} اختباراً ناجحاً`);
-        return pass === total;
-    }
-
-    // درع أمان: أي خطأ في الحساب يُسجَّل ولا يجمّد الواجهة
     function calculateGPA(isUserAction = false) {
         try {
             calculateGPACore(isUserAction);
         } catch (err) {
-            console.error('خطأ أثناء الحساب (أُبقي على آخر نتيجة صالحة):', err);
+            console.error('خطأ أثناء الحساب:', err);
         }
     }
 
-    // isUserAction: true إذا كان التعديل فعلاً مباشراً من الطالب (لتحديث وقت الحفظ)
     function calculateGPACore(isUserAction) {
         if (isUserAction) stampNow();
 
-        // لا نُقصّ الساعات المقطوعة على خطة التخصص — ذلك يُفسد نقاط المعدل الحقيقية.
-        // التضارب يُعالج كتحذير فقط في updateProgressSection.
         const oldGpa = parseFloat(DOM.oldGpa.value) || 0;
         const oldHours = parseFloat(DOM.oldHours.value) || 0;
 
@@ -720,14 +618,14 @@
 
         const coursesInput = rawCourses.map(c => ({ ...c, hours: parseFloat(c.hours) || 0 }));
         const result = computeGPA(oldGpa, oldHours, coursesInput);
-        const { semesterGpa, finalGpa, finalTotalHours, gpaHours, newSemesterHours, registeredSemesterHours } = result;
+        const { semesterGpa, finalGpa, finalTotalHours, gpaHours, newSemesterHours } = result;
 
         AppState.lastComputed = { gpa: finalGpa, hours: finalTotalHours, semHours: newSemesterHours };
         AppState.lastFull = { oldGpa, oldHours, finalGpa, gpaHours, finalTotalHours, semesterGpa, newSemHours: newSemesterHours, courses: coursesInput };
 
         renderResults(result);
         updateProgressSection(finalTotalHours, gpaHours, finalGpa);
-        checkAcademicWarnings(finalTotalHours, finalGpa, isUserAction);
+        checkAcademicWarnings(finalTotalHours, gpaHours, finalGpa, isUserAction, newSemesterHours);
         updateChart(oldGpa, finalGpa);
     }
 
@@ -739,16 +637,11 @@
     function renderResults({ finalGpa, semesterGpa, finalTotalHours, registeredSemesterHours }) {
         animateValue(DOM.resultGpa, readNumber(DOM.resultGpa), finalGpa, 250, true);
         animateValue(DOM.semesterGpaBadge, readNumber(DOM.semesterGpaBadge), semesterGpa, 250, true, '<svg class="icon"><use href="#icon-pie"/></svg> المعدل الفصلي: ');
-        animateValue(DOM.resultHours, readNumber(DOM.resultHours), finalTotalHours, 250, false, '<svg class="icon"><use href="#icon-clock"/></svg> مجموع الساعات: ');
+        animateValue(DOM.resultHours, readNumber(DOM.resultHours), finalTotalHours, 250, false, '<svg class="icon"><use href="#icon-clock"/></svg> مجموع السّاعات: ');
         animateValue(DOM.semesterHoursBadge, readNumber(DOM.semesterHoursBadge), registeredSemesterHours, 250, false, 'ساعات الفصل: ');
     }
 
-    /**
-     * ملاحظة الخطة: القوالب في #noteTemplates (index.html).
-     * - تغيّر القالب  ⇒ استنساخ + تلاشٍ كامل، وتُضبط الأرقام فوراً.
-     * - ثبات القالب وتغيّر الأرقام فقط ⇒ عدّاد متحرك على الأرقام بلا تلاشٍ.
-     */
-    const NoteAnim = { key: 'idle' }; // 'idle' مطابق لنص HTML الأولي
+    const NoteAnim = { key: 'idle' };
 
     function setNote(key, values = [], isFloat = []) {
         const note = DOM.progressNote;
@@ -782,7 +675,6 @@
         const planTotal = parseFloat(DOM.planTotal.value) || 0;
         const planTarget = parseFloat(DOM.planTarget.value) || 0;
 
-        // ساعات منجزة أكبر من الخطة (غالباً رقم الخطة خطأ): نُنبّه ولا نقصّ أي رقم
         const inconsistent = planTotal > 0 && finalTotalHours > planTotal;
         DOM.planTotal.classList.toggle('is-invalid', inconsistent);
 
@@ -793,8 +685,7 @@
         }
 
         if (!(planTotal > 0 && finalTotalHours > 0)) {
-            DOM.progressFill.style.setProperty('--progress', '0%');
-            DOM.progressPercent.textContent = '0%';
+            setProgress(0);
             setNote('idle');
             return;
         }
@@ -812,19 +703,19 @@
             return;
         }
 
-        // النقاط المكتسبة = ساعات المعدل × المعدل (مواد "ناجح" تُضاف للساعات بلا نقاط)
-        const requiredGpa = (planTotal * planTarget - gpaHours * finalGpa) / remaining;
+        const countedPlan = planTotal - (finalTotalHours - gpaHours);
+        const gpaRemaining = countedPlan - gpaHours;
+        const requiredGpa = gpaRemaining > 0 ? (countedPlan * planTarget - gpaHours * finalGpa) / gpaRemaining : 0;
 
         if (requiredGpa > CONFIG.GRADE_MAX) setNote('impossible');
         else if (requiredGpa <= 0) setNote('secured');
         else setNote('need', [requiredGpa, remaining], [true, false]);
     }
 
-    // isUserAction: الاهتزاز والاحتفال فقط مع تفاعل المستخدم
-    function checkAcademicWarnings(finalTotalHours, finalGpa, isUserAction) {
+    function checkAcademicWarnings(finalTotalHours, gpaHours, finalGpa, isUserAction, newSemesterHours) {
         let ratingText = '-';
 
-        if (finalTotalHours > 0) {
+        if (gpaHours > 0) {
             ratingText = RATINGS.find(([min]) => finalGpa >= min)[1];
 
             if (finalGpa < CONFIG.MIN_GPA) {
@@ -836,10 +727,9 @@
             } else {
                 DOM.appContainer.classList.remove('shake-animation');
                 AppState.isWarningState = false;
-                hideWarnBanner();
             }
 
-            if (finalGpa >= 3.00 && !AppState.hasCelebrated && isUserAction) {
+            if (finalGpa >= 3.00 && !AppState.hasCelebrated && isUserAction && newSemesterHours > 0) {
                 triggerConfetti(finalGpa >= 3.69 ? 'gold' : 'silver');
                 AppState.hasCelebrated = true;
             } else if (finalGpa < 3.00) {
@@ -858,27 +748,41 @@
     }
 
     // ==========================================
-    // 9. نافذة تفاصيل استقرار المعدل
+    // 9. نافذة التفاصيل والمحاكاة الجديدة
     // ==========================================
-    /*
-     * سقف تحسّن المعدل:  ΔGPA_max = (4 − Gc) × (Ht − Hc) / Ht
-     *   Gc: المعدل الحالي · Hc: الساعات المحتسبة · Ht: إجمالي ساعات التخصص
-     * يُعد المعدل "شبه مثبت" عندما يصبح السقف ≤ STABLE_DELTA.
-     */
+    function openModal(modal) {
+        modal.classList.remove('closing');
+        modal.hidden = false;
+        void modal.offsetWidth;
+        modal.classList.add('open');
+    }
+
+    function closeModal(modal) {
+        if (modal.hidden || modal.classList.contains('closing')) return;
+        modal.classList.remove('open');
+        modal.classList.add('closing');
+        modal.querySelector('.bau-modal-card').addEventListener('animationend', (e) => {
+            if (e.target !== e.currentTarget) return;
+            modal.hidden = true;
+            modal.classList.remove('closing');
+        }, { once: true });
+    }
+
     function buildDetailsContent() {
         const body = DOM.detailsBody;
         const f = AppState.lastFull || {};
         const H = f.gpaHours || 0;
+        const doneH = f.finalTotalHours || 0;
+        const hasGpa = H > 0;
         const G = f.finalGpa || 0;
         const planTotal = parseFloat(DOM.planTotal.value) || 0;
         const tpl = (name) => fromTemplate(DOM.detailTemplates, `[data-tpl="${name}"]`);
 
-        if (!H) {
+        if (!doneH) {
             body.replaceChildren(tpl('empty-no-data'));
             return;
         }
 
-        // عنصر تفصيل بترتيب ظهور متدرج (--i يقرأه CSS)
         let order = 0;
         const item = (iconId, label, ...kids) => {
             const el = h('div', 'detail-item', h('div', 'detail-label', icon(iconId), ` ${label}`), ...kids);
@@ -888,92 +792,52 @@
         const row = (cls, ...kids) => h('div', `effect-row ${cls}`.trim(), ...kids);
         const span = (cls, ...kids) => h('span', cls, ...kids);
 
-        // أثر مادة 3 ساعات بعلامة محددة: Δ = 3(g − G) / (H + 3)
-        const eff = (g) => (3 * (g - G)) / (H + 3);
         const parts = [];
 
-        if (planTotal > 0 && planTotal >= H) {
-            const remainPlan = planTotal - H;
-            const completion = Math.round((H / planTotal) * 100);
-            const dMax = ((4 - G) * remainPlan) / planTotal;  // سقف الصعود
-            const dMin = ((G - 1) * remainPlan) / planTotal;  // سقف الهبوط (أدنى متوسط للمتبقي = 1.00)
-            const stable = dMax <= CONFIG.STABLE_DELTA;
-
-            // (1) بطل السقف
-            const chipText = stable ? '✅ مستقر' : dMax <= 0.30 ? '⏳ استقرار جزئي' : '⚡ لم يستقر بعد';
-            const caption = stable
-                ? `حتى لو أتممت المتبقي كله بعلامات كاملة، لن يرتفع معدلك أكثر من +${dMax.toFixed(2)} — معدلك شبه مثبت`
-                : `لو أنجزت كل ساعاتك المتبقية (${remainPlan} سا) بعلامة كاملة (A)، فهذا أقصى ما سيصعد إليه معدلك`;
-            const bar = h('div', 'stab-hero-bar', h('span'));
-            bar.style.setProperty('--pct', `${completion}%`);
-
-            parts.push(item('icon-award', 'سقف تحسّن معدلك (ΔGPA الأقصى)',
-                h('div', 'stab-hero',
-                    h('div', 'stab-hero-top',
-                        h('div', 'stab-hero-num', counter(dMax, { prefix: '+' }), ' ', h('small', '', `أنجزت ${H} من ${planTotal} سا (${completion}%)`)),
-                        h('span', `stab-hero-state ${stable ? 'ok' : 'wait'}`, chipText)),
-                    bar,
-                    h('div', 'stab-hero-cap', caption))));
-
-            // (2) نقطة التعادل: فصلي ≥ التراكمي يرفعه، وأقل ينزله — الهدف الدنيا لكل فصل
-            {
-                const breakEvenRows = [
-                    row('', span('', 'معدل فصلي'), counter(G, { cls: 'tone-primary' }), span('', 'أو أكثر يرفع تراكمك ▲'))
-                ];
-                if (f.newSemHours > 0 && f.semesterGpa > 0) {
-                    const above = f.semesterGpa >= G;
-                    breakEvenRows.push(row(above ? 'effect-row--ok' : 'effect-row--strong',
-                        span('', 'فصلك الحالي'),
-                        span(above ? 'is-up' : 'is-down', f.semesterGpa.toFixed(2)),
-                        span(above ? 'tone-primary' : 'tone-strong', above ? 'فوق التعادل ✓' : 'تحت التعادل — ارفعه ⚠')));
-                }
-                parts.push(item('icon-clock', 'نقطة التعادل', ...breakEvenRows));
-            }
-
-            // (3) النقاط نحو الهدف: المحققة فعلاً ÷ المطلوبة (مؤشر تقدم ملموس)
-            if (planTarget > 0) {
-                const earnedPts = G * H;                  // نقاطك الحقيقية المحتسبة
-                const neededPts = planTarget * planTotal; // نقاط الهدف
-                const ptsPct = Math.min(100, Math.round((earnedPts / neededPts) * 100));
-                const securedPts = earnedPts >= neededPts;
-                const ptsBar = h('div', 'stab-hero-bar', h('span'));
-                ptsBar.style.setProperty('--pct', `${ptsPct}%`);
-
-                parts.push(item('icon-cap', 'النقاط نحو هدفك',
+        if (planTotal > 0 && planTotal >= doneH) {
+            const remainPlan = planTotal - doneH;
+            const completion = Math.round((doneH / planTotal) * 100);
+            
+            if (!hasGpa) {
+                const passBar = h('div', 'stab-hero-bar', h('span'));
+                passBar.style.setProperty('--pct', `${completion}%`);
+                parts.push(item('icon-cap', 'إنجاز خطة تخصصك',
                     h('div', 'stab-hero',
                         h('div', 'stab-hero-top',
-                            h('div', 'stab-hero-num', counter(Math.round(earnedPts), { float: false }), ' ', h('small', '', `/ ${Math.round(neededPts)} مطلوبة (${ptsPct}%)`)),
-                            h('span', `stab-hero-state ${securedPts ? 'ok' : 'wait'}`, securedPts ? '✅ ضمنته' : `${ptsPct}%`)),
-                        ptsBar,
-                        h('div', 'stab-hero-cap', securedPts
-                            ? 'نقاطك الحالية تكفي للمعدل المستهدف — حافظ على المستوى'
-                            : `حققت ${ptsPct}% من نقاط هدفك — تبقى ${Math.round(neededPts - earnedPts)} نقطة`))));
+                            h('div', 'stab-hero-num', counter(doneH, { float: false }), ' ', h('small', '', `من ${planTotal} ساعة (${completion}%)`)),
+                            h('span', 'stab-hero-state ok', '✅ ساعات منجزة')),
+                        passBar,
+                        h('div', 'stab-hero-cap', 'موادك "ناجح" لا تُحتسب بالمعدل — أدخل مواداً مقيّمة بعلامات لتفعيل تحليل الاستقرار'))));
             }
 
-            // (4) متى يستقر؟  Hc ≥ Ht × (1 − δ/(4−G))
-            if (stable) {
-                parts.push(item('icon-clock', 'متى يستقر معدلي؟',
-                    row('effect-row--ok', span('', '✅ معدلك مستقر الآن فعلاً'), span('tone-primary', `سقف تحسنه ≤ ${CONFIG.STABLE_DELTA.toFixed(2)}`))));
-            } else {
-                const stableAt = Math.ceil(planTotal * (1 - CONFIG.STABLE_DELTA / (4 - G)));
-                const remainStable = Math.max(0, stableAt - H);
-                const semesters = Math.ceil(remainStable / CONFIG.SEMESTER_HOURS);
-                const semText = semesters > 0 ? ` (~${semesters} ${semesters === 1 ? 'فصل' : 'فصول'})` : '';
-                parts.push(item('icon-clock', 'متى يستقر معدلي؟',
-                    row('', span('', 'يستقر عند'), span('', counter(stableAt, { float: false }), ' ساعة محتسبة')),
-                    row('', span('', 'أي بعد'), span('', counter(remainStable, { float: false }), ` ساعة إضافية${semText}`))));
-            }
+            if (hasGpa) {
+                const dMax = ((4 - G) * remainPlan) / planTotal;
+                const stable = dMax <= CONFIG.STABLE_DELTA;
 
-            // (5) سقفا الصعود والهبوط
-            parts.push(item('icon-pie', 'سقفا التغيّر المتبقيين',
-                row('', span('', 'أقصى صعود (A بكل المتبقي)'), counter(dMax, { prefix: '+', cls: 'is-up' })),
-                row('', span('', 'أقصى هبوط (رسوب بكل المتبقي)'), counter(dMin, { prefix: '−', cls: 'is-down' }))));
+                // صف نقطة التعادل الذي يعرض المعدل المطلوب لرفع التراكمي
+                const breakEvenRow = row('', span('', 'يجب الحصول على معدل'), counter(G, { cls: 'tone-primary' }), span('', 'فصلياً لاستقرار معدلك'));
+
+                if (stable) {
+                    parts.push(item('icon-clock', 'متى يستقر معدلي؟',
+                        row('effect-row--ok', span('', '✅ معدلك مستقر الآن فعلاً'), span('tone-primary', `سقف تحسنه ≤ ${CONFIG.STABLE_DELTA.toFixed(2)}`)),
+                        breakEvenRow
+                    ));
+                } else {
+                    const stableAt = Math.ceil(planTotal * (1 - CONFIG.STABLE_DELTA / (4 - G)));
+                    const remainStable = Math.max(0, stableAt - H);
+                    const semesters = Math.ceil(remainStable / CONFIG.SEMESTER_HOURS);
+                    const semText = semesters > 0 ? ` (~${semesters} ${semesters === 1 ? 'فصل' : 'فصول'})` : '';
+                    parts.push(item('icon-clock', 'متى يستقر معدلك ؟',
+                        row('', span('', 'يستقر عند'), span('', counter(stableAt, { float: false }), ' ساعة محتسبة')),
+                        row('', span('', 'على بعد'), span('', counter(remainStable, { float: false }), ` ساعة إضافية${semText}`)),
+                        breakEvenRow
+                    ));
+                }
+            }
         } else {
-            // بلا خطة معلومة: المعادلة تحتاج Ht
             parts.push(item('icon-cap', 'تحليل الاستقرار', tpl('empty-no-plan')));
         }
 
-        // (4) أثر الفصل الحالي على التراكمي
         if (f.oldHours > 0 && f.newSemHours > 0) {
             const impact = G - f.oldGpa;
             const abs = Math.abs(impact);
@@ -987,55 +851,60 @@
                     span(`tone-${tone}`, label))));
         }
 
-        // (6) قراءة التاريخ المسجل: الاتجاه + توقع التخرج + التذبذب
-        // يستفيد من gpaHistory التي يملؤها الترحيل التلقائي أو نافذة "إضافة جميع الفصول"
         const hist = (AppState.gpaHistory || []).filter(v => !isNaN(v));
         if (hist.length >= 2) {
             const n = hist.length;
             const firstV = hist[0], lastV = hist[n - 1];
-            const rate = (lastV - firstV) / (n - 1); // متوسط التغير/فصل
+            const rate = (lastV - firstV) / (n - 1);
             const maxV = Math.max(...hist), minV = Math.min(...hist);
             const labelFor = (i) => {
                 const d = n - i;
                 return d === 1 ? 'الفصل الماضي' : d === 2 ? 'منذ فصلين' : `منذ ${d} فصول`;
             };
-            const swing = maxV - minV;
+
+            const recentHist = hist.slice(-3);
+            const swing = Math.max(...recentHist) - Math.min(...recentHist);
+
             const [tone, toneLabel] = swing <= 0.15 ? ['ok', 'أداء مستقر']
                 : swing <= 0.35 ? ['medium', 'تذبذب متوسط']
                 : ['strong', 'أداء متقلب'];
 
             const rows = [
-                row('', span('', 'متوسط تغيّرك/فصل'),
-                    counter(rate, { prefix: rate >= 0 ? '+' : '', cls: rate >= 0 ? 'is-up' : 'is-down' }))
-            ];
-
-            // توقع التخرج عند استمرار الوتيرة (يتطلب معرفة الخطة)
-            if (planTotal > 0 && planTotal > H && Math.abs(rate) >= 0.005) {
-                const semsLeft = Math.ceil((planTotal - H) / CONFIG.SEMESTER_HOURS);
-                if (semsLeft > 0) {
-                    const projected = Math.min(CONFIG.GRADE_MAX, Math.max(0, lastV + rate * semsLeft));
-                    rows.push(row('',
-                        span('', `عند هذا الوتيرة (${semsLeft} ${pluralize(semsLeft, ['فصل', 'فصلين', 'فصول', 'فصل'])} للتخرج)`),
-                        counter(projected, { cls: projected >= lastV ? 'is-up' : 'is-down' })));
-                }
-            }
-
-            rows.push(
+                row('', span('', 'متوسط تغيّرك/فصل'), counter(rate, { prefix: rate >= 0 ? '+' : '', cls: rate >= 0 ? 'is-up' : 'is-down' })),
                 row('', span('', `أعلى معدل (${labelFor(hist.indexOf(maxV))})`), span('', maxV.toFixed(2))),
                 row('', span('', `أدنى معدل (${labelFor(hist.indexOf(minV))})`), span('', minV.toFixed(2))),
-                row(`effect-row--${tone}`, span('', 'مدى التذبذب'), span(`tone-${tone}`, `${swing.toFixed(2)} · ${toneLabel}`))
-            );
+                row(`effect-row--${tone}`, span('', 'مدى التذبذب (آخر 3 فصول)'), span(`tone-${tone}`, `${swing.toFixed(2)} · ${toneLabel}`))
+            ];
 
-            parts.push(item('icon-cap', `قراءة تاريخك (${n} ${pluralize(n, ['فصل', 'فصلين', 'فصول', 'فصل'])})`, ...rows));
+            parts.push(item('icon-cap', `تحليل آدائك عبر ${n} ${pluralize(n, ['فصل', 'فصلين', 'فصول', 'فصل'])}`, ...rows));
         }
 
-        // (7) أثر مادة واحدة (3 ساعات)
-        // (7) أثر مادة واحدة (3 ساعات)
-        parts.push(item('icon-book', 'لو أضفت مادة 3 ساعات الآن',
-            row('', span('grade-tag grade-tag--best', 'A كاملة'), span('', 'ستغيّر تراكميك'), counter(eff(4), { prefix: '+', cls: 'is-up' })),
-            row('', span('grade-tag grade-tag--worst', 'رسوب (-D)'), span('', 'ستغيّر تراكميك'), counter(eff(1), { cls: 'is-down' }))));
+        // محاكاة الساعات الديناميكية المضافة جديداً
+        if (hasGpa) {
+            const calcEff = (g, hrs) => (hrs * (g - G)) / (H + hrs);
+            
+            const hrsSelect = h('select', 'sim-select');
+            [1, 2, 3, 4, 5, 6].forEach(val => {
+                hrsSelect.append(new Option(`${val} ${val <= 2 ? 'ساعة' : 'ساعات'}`, val));
+            });
+            hrsSelect.value = '3'; 
 
-        // (9) القاعدة الختامية
+            const bestVal = counter(calcEff(4, 3), { prefix: '+', cls: 'is-up' });
+            const worstVal = counter(calcEff(1, 3), { cls: 'is-down' });
+
+            hrsSelect.addEventListener('change', (e) => {
+                const hrs = parseInt(e.target.value, 10);
+                animateValue(bestVal, parseFloat(bestVal.textContent) || 0, calcEff(4, hrs), 300, true, '+');
+                animateValue(worstVal, parseFloat(worstVal.textContent) || 0, calcEff(1, hrs), 300, true, '');
+            });
+
+            parts.push(item('icon-book', 'محاكاة إضافة مادة جديدة',
+                row('', span('', 'اختر عدد الساعات:'), hrsSelect),
+                row('', span('grade-tag grade-tag--best', 'A كاملة'), span('', 'ستغيّر تراكميك'), bestVal),
+                row('', span('grade-tag grade-tag--worst', 'رسوب (-D)'), span('', 'ستغيّر تراكميك'), worstVal)
+            ));
+        }
+
         const rule = tpl('rule');
         rule.querySelector('.rule-delta').textContent = CONFIG.STABLE_DELTA.toFixed(2);
         rule.classList.add('detail-item');
@@ -1045,39 +914,15 @@
         body.replaceChildren(...parts);
     }
 
-    // تحريك أرقام النافذة بعدّاد عند فتحها
     function animateDetailVals() {
         DOM.detailsBody.querySelectorAll('.d-val').forEach(el => {
             animateValue(el, 0, parseFloat(el.dataset.target) || 0, 700, el.dataset.float !== '0', el.dataset.prefix || '');
         });
     }
 
-    // الحركات كلها في CSS (كلاسا open / closing) — JS ينتظر انتهاءها فقط
-    function openDetailsModal() {
-        const modal = DOM.detailsModal;
-        buildDetailsContent();
-        modal.classList.remove('closing');
-        modal.hidden = false;
-        void modal.offsetWidth;
-        modal.classList.add('open');
-        modal.querySelector('.bau-modal-card').addEventListener('animationend', animateDetailVals, { once: true });
-    }
-
-    function closeDetailsModal() {
-        const modal = DOM.detailsModal;
-        if (modal.hidden || modal.classList.contains('closing')) return;
-        modal.classList.remove('open');
-        modal.classList.add('closing');
-        modal.querySelector('.bau-modal-card').addEventListener('animationend', () => {
-            modal.hidden = true;
-            modal.classList.remove('closing');
-        }, { once: true });
-    }
-
     // ==========================================
-    // 9ب. نافذة "إضافة جميع الفصول" — إدارة سجل التتبع بصفوف ديناميكية
+    // 9ب. نافذة "إضافة جميع الفصول"
     // ==========================================
-    // صف معدل: ترقيم + حقل منسق (data-gpa) + زر حذف — بنفس فلسفة بطاقات المواد
     function createHistoryRow(value = '') {
         const input = h('input', 'hist-input');
         input.type = 'text';
@@ -1113,38 +958,13 @@
     function removeHistoryRow(button) {
         const rows = DOM.historyList.querySelectorAll('.hist-row');
         if (rows.length <= 1) {
-            rows[0].querySelector('input').value = ''; // صف واحد يبقى لكن يُفرَّغ
+            rows[0].querySelector('input').value = '';
             return;
         }
         button.closest('.hist-row').remove();
         updateHistoryNumbers();
     }
 
-    function openHistoryModal() {
-        // ابنِ الصفوف من السجل الحالي (الأقدم ← الأحدث)؛ صف فارغ واحد إن كان فارغاً
-        const values = (AppState.gpaHistory || []).map(v => Number(v).toFixed(2));
-        DOM.historyList.replaceChildren(...(values.length ? values : ['']).map(createHistoryRow));
-        updateHistoryNumbers();
-
-        const modal = DOM.historyModal;
-        modal.classList.remove('closing');
-        modal.hidden = false;
-        void modal.offsetWidth;
-        modal.classList.add('open');
-    }
-
-    function closeHistoryModal() {
-        const modal = DOM.historyModal;
-        if (modal.hidden || modal.classList.contains('closing')) return;
-        modal.classList.remove('open');
-        modal.classList.add('closing');
-        modal.querySelector('.bau-modal-card').addEventListener('animationend', () => {
-            modal.hidden = true;
-            modal.classList.remove('closing');
-        }, { once: true });
-    }
-
-    // الحفظ: تجمع القيم (الأقدم ← الأحدث) وتكتبها للسجل وخانتي hist1/hist2 ثم تعيد الحساب
     function saveHistoryModal() {
         const values = Array.from(DOM.historyList.querySelectorAll('.hist-input'))
             .map(i => parseFloat(i.value))
@@ -1152,84 +972,74 @@
 
         AppState.gpaHistory = values.slice(-CONFIG.MAX_TRACKED);
 
-        // الخانتان اليدويتان المرئيتان = آخر معدلين (توافق رجعي مع الرسم الحالي)
-        const n = values.length;
-        DOM.hist1.value = n >= 2 ? values[n - 2].toFixed(2) : '';
-        DOM.hist2.value = n >= 1 ? values[n - 1].toFixed(2) : '';
+        const n = AppState.gpaHistory.length;
+        DOM.hist1.value = n >= 2 ? AppState.gpaHistory[n - 2].toFixed(2) : '';
+        DOM.hist2.value = n >= 1 ? AppState.gpaHistory[n - 1].toFixed(2) : '';
 
-        closeHistoryModal();
-        calculateGPA(true); // يحفظ gpaHistory محدثاً ويعيد رسم المنحنى
+        closeModal(DOM.historyModal);
+        calculateGPA(true);
     }
 
     // ==========================================
     // 10. الرسم البياني والاحتفال
     // ==========================================
-function updateChart(oldGpa, finalGpa) {
-    try {
-        // 1. جلب العناصر بأمان تام (Fallback to null)
-        const hist1Element = document.getElementById('hist1');
-        const hist2Element = document.getElementById('hist2');
-        
-        const h1 = hist1Element ? parseFloat(hist1Element.value) : NaN;
-        const h2 = hist2Element ? parseFloat(hist2Element.value) : NaN;
+    function updateChart(oldGpa, finalGpa) {
+        try {
+            const h1 = parseFloat(DOM.hist1.value);
+            const h2 = parseFloat(DOM.hist2.value);
 
-        // 2. السجل من حالة التطبيق — يملؤه الترحيل التلقائي ونافذة "إضافة جميع الفصول"
-        let historyArray = Array.isArray(AppState.gpaHistory) ? [...AppState.gpaHistory] : [];
-        let mergedHistory = [...historyArray];
+            let historyArray = Array.isArray(AppState.gpaHistory) ? [...AppState.gpaHistory] : [];
+            let mergedHistory = [...historyArray];
 
-        // مزامنة الإدخال اليدوي بأمان
-        if (!isNaN(h2)) {
-            if (mergedHistory.length >= 1) mergedHistory[mergedHistory.length - 1] = h2;
-            else mergedHistory.push(h2);
-        }
-        if (!isNaN(h1)) {
-            if (mergedHistory.length >= 2) mergedHistory[mergedHistory.length - 2] = h1;
-            else if (mergedHistory.length === 1) mergedHistory.unshift(h1);
-            else if (mergedHistory.length === 0) { mergedHistory.push(h1); if (!isNaN(h2)) mergedHistory.push(h2); }
-        }
-
-        let timeline = [];
-        mergedHistory.forEach((g, i) => {
-            const d = mergedHistory.length - i;
-            timeline.push({ label: d === 1 ? 'الفصل الماضي' : d === 2 ? 'منذ فصلين' : `منذ ${d} فصول`, val: g });
-        });
-
-        if (oldGpa > 0 && !isNaN(oldGpa)) timeline.push({ label: 'المعدل الحالي', val: oldGpa });
-        if (!isNaN(finalGpa)) timeline.push({ label: 'المعدل الجديد', val: finalGpa });
-
-        const labels = [];
-        const data = [];
-        timeline.forEach((pt, i) => {
-            const v = parseFloat(pt.val);
-            if (isNaN(v)) return;
-            const last = data[data.length - 1];
-            if (i === timeline.length - 1 || last === undefined || Math.abs(last - v) >= 0.005) {
-                labels.push(pt.label);
-                data.push(v);
+            if (!isNaN(h2)) {
+                if (mergedHistory.length >= 1) mergedHistory[mergedHistory.length - 1] = h2;
+                else mergedHistory.push(h2);
             }
-        });
+            if (!isNaN(h1)) {
+                if (mergedHistory.length >= 2) mergedHistory[mergedHistory.length - 2] = h1;
+                else if (mergedHistory.length === 1) mergedHistory.unshift(h1);
+                else if (mergedHistory.length === 0) { mergedHistory.push(h1); if (!isNaN(h2)) mergedHistory.push(h2); }
+            }
 
-        // 3. منع إعادة الرسم غير المبرر للحفاظ على الأداء
-        const signature = JSON.stringify({ labels, data });
-        if (window.lastChartDataString === signature) return;
-        window.lastChartDataString = signature;
+            while (mergedHistory.length > CONFIG.MAX_TRACKED) mergedHistory.shift();
 
-        // 4. استدعاء دالة الرسم بأمان (تأكد أن اسم دالة الرسم الخاصة بك هو initChart)
-        if (typeof initChart === 'function') {
+            let timeline = [];
+            mergedHistory.forEach((g, i) => {
+                const d = mergedHistory.length - i;
+                timeline.push({ label: d === 1 ? 'الفصل الماضي' : d === 2 ? 'منذ فصلين' : `منذ ${d} فصول`, val: g });
+            });
+
+            if (oldGpa > 0 && !isNaN(oldGpa)) timeline.push({ label: 'المعدل الحالي', val: oldGpa });
+            if (!isNaN(finalGpa)) timeline.push({ label: 'المعدل الجديد', val: finalGpa });
+
+            const labels = [];
+            const data = [];
+            timeline.forEach((pt, i) => {
+                const v = parseFloat(pt.val);
+                if (isNaN(v)) return;
+                const last = data[data.length - 1];
+                if (i === timeline.length - 1 || last === undefined || Math.abs(last - v) >= 0.005) {
+                    labels.push(pt.label);
+                    data.push(v);
+                }
+            });
+
+            const signature = JSON.stringify({ labels, data });
+            if (AppState.lastChartDataString === signature) return;
+            AppState.lastChartDataString = signature;
+
             const yMin = Math.max(0, Math.min(...data) - 0.15);
-            const yMax = Math.min(4.0, Math.max(...data) + 0.15); // 4.0 هو سقف معدلات البلقاء
+            const yMax = Math.min(4.0, Math.max(...data) + 0.15);
             initChart(labels, data, yMin, yMax);
-        }
 
-    } catch (error) {
-        // إذا حدث خطأ هنا، سيتم طباعته في الكونسول ولن ينهار باقي الموقع
-        console.error("تم احتواء خطأ في رسم المنحنى:", error);
+        } catch (error) {
+            console.error("تم احتواء خطأ في رسم المنحنى:", error);
+        }
     }
-}
 
     function initChart(labels, data, yMin, yMax) {
         const canvas = document.getElementById('gpaChart');
-        if (!canvas || typeof Chart === 'undefined') return; // Chart.js لم يُحمّل (أو فشل تحميله)
+        if (!canvas || typeof Chart === 'undefined') return;
 
         if (AppState.chartInstance) {
             const chart = AppState.chartInstance;
@@ -1281,7 +1091,6 @@ function updateChart(oldGpa, finalGpa) {
         return AppState.confettiPromise;
     }
 
-    // احتفال حسب المستوى: gold (امتياز) / silver (جيد جداً)
     async function triggerConfetti(style = 'silver') {
         try { await loadConfettiLib(); } catch (e) { return; }
         const configs = {
@@ -1303,7 +1112,6 @@ function updateChart(oldGpa, finalGpa) {
     const debouncedCalculateAndSave = debounce(() => calculateGPA(true), CONFIG.CALC_DEBOUNCE_MS);
 
     function bindEvents() {
-        // ---- المواد (تفويض أحداث) ----
         DOM.coursesContainer.addEventListener('click', (e) => {
             const del = e.target.closest('.delete-btn');
             if (del) { removeCourse(del); return; }
@@ -1319,16 +1127,10 @@ function updateChart(oldGpa, finalGpa) {
 
         DOM.coursesContainer.addEventListener('change', (e) => {
             const t = e.target;
-            if (t.classList.contains('repeat-checkbox')) {
-                toggleRepeat(t);
-                debouncedCalculateAndSave();
-            } else if (t.classList.contains('course-hours')) {
-                onHoursChange(t);
-                debouncedCalculateAndSave();
-            }
+            if (t.classList.contains('repeat-checkbox')) toggleRepeat(t);
+            else if (t.classList.contains('course-hours')) onHoursChange(t);
         });
 
-        // ---- أي إدخال: تنسيق/تقييد الحقول المعلَّمة ثم إعادة الحساب ----
         DOM.appContainer.addEventListener('input', (e) => {
             const t = e.target;
             if (t.matches('[data-gpa]')) formatGpaInput(e);
@@ -1336,44 +1138,51 @@ function updateChart(oldGpa, finalGpa) {
             debouncedCalculateAndSave();
         });
 
-        // ---- الأزرار ----
-        const on = (id, fn) => document.getElementById(id).addEventListener('click', fn);
-        on('resetBtn', resetCalculator);
-        on('addCourseBtn', addCourse);
-        on('nextSemesterBtn', moveToNextSemester);
-        on('undoBtn', undoDelete);
-        on('detailsBtn', openDetailsModal);
-        on('detailsCloseBtn', closeDetailsModal);
-        on('detailsBackdrop', closeDetailsModal);
+        DOM.resetBtn.addEventListener('click', resetCalculator);
+        DOM.addCourseBtn.addEventListener('click', addCourse);
+        DOM.nextSemesterBtn.addEventListener('click', moveToNextSemester);
+        DOM.undoBtn.addEventListener('click', undoDelete);
+        
+        DOM.detailsBtn.addEventListener('click', () => {
+            buildDetailsContent();
+            openModal(DOM.detailsModal);
+            DOM.detailsModal.querySelector('.bau-modal-card').addEventListener('animationend', animateDetailVals, { once: true });
+        });
+        DOM.detailsCloseBtn.addEventListener('click', () => closeModal(DOM.detailsModal));
+        DOM.detailsBackdrop.addEventListener('click', () => closeModal(DOM.detailsModal));
 
-        // ---- نافذة فصول التتبع ----
-        on('historyBtn', openHistoryModal);
-        on('historyCloseBtn', closeHistoryModal);
-        on('historyBackdrop', closeHistoryModal);
-        on('historyAddBtn', () => addHistoryRow());
-        on('historySaveBtn', saveHistoryModal);
+        DOM.historyBtn.addEventListener('click', () => {
+            const values = (AppState.gpaHistory || []).map(v => Number(v).toFixed(2));
+            DOM.historyList.replaceChildren(...(values.length ? values : ['']).map(createHistoryRow));
+            updateHistoryNumbers();
+            openModal(DOM.historyModal);
+        });
+        DOM.historyCloseBtn.addEventListener('click', () => closeModal(DOM.historyModal));
+        DOM.historyBackdrop.addEventListener('click', () => closeModal(DOM.historyModal));
+        DOM.historyAddBtn.addEventListener('click', () => addHistoryRow());
+        DOM.historySaveBtn.addEventListener('click', saveHistoryModal);
 
         DOM.historyModal.addEventListener('click', (e) => {
             const del = e.target.closest('.hist-del');
             if (del) removeHistoryRow(del);
         });
-        // تنسيق حقول المعدلات داخل النافذة (خارج appContainer)
+
         DOM.historyModal.addEventListener('input', (e) => {
             if (e.target.matches('[data-gpa]')) formatGpaInput(e);
         });
+
         DOM.historyModal.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && e.target.matches('input')) saveHistoryModal();
         });
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') { closeDetailsModal(); closeHistoryModal(); }
+            if (e.key === 'Escape') { closeModal(DOM.detailsModal); closeModal(DOM.historyModal); }
         });
     }
 
     window.addEventListener('DOMContentLoaded', () => {
         cacheDOM();
 
-        // مدد العدّادات تُقرأ في CSS من متغيراتها — قيمة واحدة في JS
         const root = document.documentElement.style;
         root.setProperty('--undo-duration', `${CONFIG.UNDO_MS}ms`);
         root.setProperty('--warn-duration', `${CONFIG.WARN_MS}ms`);
@@ -1385,6 +1194,4 @@ function updateChart(oldGpa, finalGpa) {
         AppState.timeUpdateInterval = setInterval(updateSaveIndicator, CONFIG.SAVE_REFRESH_MS);
     });
 
-    // متاحة من كونسول المتصفح للتحقق من قواعد الحساب
-    window.runSelfTests = runSelfTests;
 })();
