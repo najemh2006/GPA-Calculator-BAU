@@ -18,10 +18,12 @@
         MIN_GPA: 2.00,
         MAX_COURSES: 12,
         DEFAULT_COURSES: 4,
-        MAX_HISTORY: 6,
-        MAX_TRACKED: 12,
+        MAX_TRACKED: 27,          // أقصى عدد فصول محفوظة (الترحيل التلقائي + نافذة التتبع)
         STABLE_DELTA: 0.10,
-        SEMESTER_HOURS: 15
+        SEMESTER_HOURS: 15,
+        CHART_POINT_PX: 56,       // أقل عرض لكل نقطة في المنحنى ليبقى مرتباً ومقروءاً
+        CHART_AXIS_PX: 48,        // عرض محور Y والحواشي المحجوزة داخل المنحنى
+        CHART_MIN_POINTS: 3       // أقل عدد نقاط يُعرض مهما ضاقت الشاشة
     };
 
     const Store = {
@@ -47,19 +49,28 @@
         [2.00, 'مقبول 👍'], [-Infinity, 'ضعيف ⚠️']
     ];
 
+    // صيغ المعدود: [مفرد، مثنى، جمع (3–10)، تمييز مفرد منصوب (11 فأكثر)]
     const TIME_UNITS = [
-        { secs: 86400, forms: ['يوم', 'يومين', 'أيام', 'يوم'] },
-        { secs: 3600, forms: ['ساعة', 'ساعتين', 'ساعات', 'ساعة'] },
-        { secs: 60, forms: ['دقيقة', 'دقيقتين', 'دقائق', 'دقيقة'] }
+        { secs: 86400, forms: ['يوم', 'يومين', 'أيام', 'يوماً'] },
+        { secs: 3600, forms: ['ساعة', 'ساعتين', 'ساعات', 'ساعةً'] },
+        { secs: 60, forms: ['دقيقة', 'دقيقتين', 'دقائق', 'دقيقةً'] }
     ];
 
+    const SEMESTER_FORMS = ['فصل', 'فصلين', 'فصول', 'فصلاً'];
+
     const SVG_NS = 'http://www.w3.org/2000/svg';
+
+    // تسميات المنحنى من سطرين (أضيق عرضاً، فتتسع نقاط أكثر على الشاشة)
+    const LABEL_CURRENT = ['المعدل', 'الحالي'];
+    const LABEL_NEW = ['المعدل', 'الجديد'];
+    const DEFAULT_CHART_LABELS = [LABEL_CURRENT, LABEL_NEW];
 
     // ==========================================
     // 2. الحالة والعناصر
     // ==========================================
     const AppState = {
         chartInstance: null,
+        chartCapacity: 0,
         hasCelebrated: false,
         isWarningState: false,
         confettiPromise: null,
@@ -87,7 +98,7 @@
             'appContainer', 'progressPercent', 'progressFill', 'progressNote',
             'undoToast', 'undoMsg', 'undoTimerText', 'saveStatusText',
             'warnToast', 'warnMsg', 'detailsModal', 'detailsBody',
-            'historyModal', 'historyList',
+            'historyModal', 'historyList', 'gpaChart',
             'courseTemplate', 'noteTemplates', 'detailTemplates',
             'resetBtn', 'addCourseBtn', 'nextSemesterBtn', 'undoBtn', 'detailsBtn',
             'detailsCloseBtn', 'detailsBackdrop', 'historyBtn', 'historyCloseBtn',
@@ -118,6 +129,15 @@
         if (count === 2) return two;
         return (count >= 3 && count <= 10) ? few : many;
     }
+
+    // العدد مع معدوده بصيغة صحيحة: «فصل»، «فصلين»، «5 فصول»، «12 فصلاً»
+    function countPhrase(count, forms) {
+        return (count === 1 || count === 2) ? pluralize(count, forms) : `${count} ${pluralize(count, forms)}`;
+    }
+
+    // تسمية الفصل السابق حسب بُعده عن الفصل الحالي (سطران لتضييق العرض في المنحنى)
+    const semesterLabel = (d) =>
+        d === 1 ? ['الفصل', 'الماضي'] : d === 2 ? ['منذ', 'فصلين'] : [`منذ ${d}`, pluralize(d, SEMESTER_FORMS)];
 
     const h = (tag, cls = '', ...kids) => {
         const el = document.createElement(tag);
@@ -195,7 +215,7 @@
         else {
             const unit = TIME_UNITS.find(u => diff >= u.secs);
             const n = Math.floor(diff / unit.secs);
-            text = `منذ ${n} ${pluralize(n, unit.forms)}`;
+            text = `منذ ${countPhrase(n, unit.forms)}`;
         }
         DOM.saveStatusText.textContent = `تم الحفظ: ${text}`;
     }
@@ -219,7 +239,7 @@
         if (!raw) {
             stampNow();
             addDefaultCourses();
-            initChart(['المعدل الحالي', 'المعدل الجديد'], [0, 0], 0, 4);
+            initChart(DEFAULT_CHART_LABELS, [0, 0], 0, 4);
             calculateGPA(false);
             return;
         }
@@ -261,11 +281,11 @@
                 addDefaultCourses();
             }
         } catch (error) {
-            console.warn('تعذرت قراءة البيانات المحفوظة:', error);
+            console.warn('تعذّرت قراءة البيانات المحفوظة:', error);
             Store.remove(CONFIG.STORAGE_KEY);
             addDefaultCourses();
         }
-        initChart(['المعدل الحالي', 'المعدل الجديد'], [0, 0], 0, 4);
+        initChart(DEFAULT_CHART_LABELS, [0, 0], 0, 4);
         calculateGPA(false);
     }
 
@@ -314,7 +334,7 @@
         const prevNum = parseFloat(prevGpaVal);
         if (!isNaN(prevNum) && prevNum > 0) {
             AppState.gpaHistory.push(prevNum);
-            if (AppState.gpaHistory.length > CONFIG.MAX_HISTORY) AppState.gpaHistory.shift();
+            if (AppState.gpaHistory.length > CONFIG.MAX_TRACKED) AppState.gpaHistory.shift();
         }
 
         if (prevGpaVal !== '' && prevGpaVal !== DOM.hist2.value) DOM.hist2.value = prevGpaVal;
@@ -346,7 +366,7 @@
     function fillGradeSelect(select, isZeroHours, selected = '') {
         const opts = isZeroHours
             ? [['', 'اختر النتيجة'], ['pass', 'ناجح'], ['fail', 'راسب']]
-            : [['', 'اختر العلامة'], ['pass', 'ناجح (لا تُحتسب بالمعدل)'], ...GRADES.map(g => [g.v, g.l])];
+            : [['', 'اختر العلامة'], ['pass', 'ناجح (لا تُحتسب في المعدل)'], ...GRADES.map(g => [g.v, g.l])];
 
         select.replaceChildren(...opts.map(([value, text]) => {
             const option = new Option(text, value);
@@ -637,7 +657,7 @@
     function renderResults({ finalGpa, semesterGpa, finalTotalHours, registeredSemesterHours }) {
         animateValue(DOM.resultGpa, readNumber(DOM.resultGpa), finalGpa, 250, true);
         animateValue(DOM.semesterGpaBadge, readNumber(DOM.semesterGpaBadge), semesterGpa, 250, true, '<svg class="icon"><use href="#icon-pie"/></svg> المعدل الفصلي: ');
-        animateValue(DOM.resultHours, readNumber(DOM.resultHours), finalTotalHours, 250, false, '<svg class="icon"><use href="#icon-clock"/></svg> مجموع السّاعات: ');
+        animateValue(DOM.resultHours, readNumber(DOM.resultHours), finalTotalHours, 250, false, '<svg class="icon"><use href="#icon-clock"/></svg> مجموع الساعات: ');
         animateValue(DOM.semesterHoursBadge, readNumber(DOM.semesterHoursBadge), registeredSemesterHours, 250, false, 'ساعات الفصل: ');
     }
 
@@ -722,7 +742,7 @@
                 if (isUserAction && !AppState.isWarningState) {
                     retriggerAnimation(DOM.appContainer, 'shake-animation');
                     AppState.isWarningState = true;
-                    showWarnBanner(`معدلك التراكمي ${finalGpa.toFixed(2)} تحت الحد الأدنى (${CONFIG.MIN_GPA.toFixed(2)})`);
+                    showWarnBanner(`معدلك التراكمي ${finalGpa.toFixed(2)} أقل من الحد الأدنى (${CONFIG.MIN_GPA.toFixed(2)})`);
                 }
             } else {
                 DOM.appContainer.classList.remove('shake-animation');
@@ -741,14 +761,14 @@
             AppState.hasCelebrated = false;
         }
 
-        const ratingHtml = `<svg class="icon"><use href="#icon-award"/></svg> التّقدير: ${ratingText}`;
+        const ratingHtml = `<svg class="icon"><use href="#icon-award"/></svg> التقدير: ${ratingText}`;
         if (DOM.gpaRating.innerHTML !== ratingHtml) DOM.gpaRating.innerHTML = ratingHtml;
 
         if (finalTotalHours === 0 || finalGpa >= CONFIG.MIN_GPA) hideWarnBanner();
     }
 
     // ==========================================
-    // 9. نافذة التفاصيل والمحاكاة الجديدة
+    // 9. نافذة التفاصيل والمحاكاة
     // ==========================================
     function openModal(modal) {
         modal.classList.remove('closing');
@@ -797,7 +817,7 @@
         if (planTotal > 0 && planTotal >= doneH) {
             const remainPlan = planTotal - doneH;
             const completion = Math.round((doneH / planTotal) * 100);
-            
+
             if (!hasGpa) {
                 const passBar = h('div', 'stab-hero-bar', h('span'));
                 passBar.style.setProperty('--pct', `${completion}%`);
@@ -807,30 +827,25 @@
                             h('div', 'stab-hero-num', counter(doneH, { float: false }), ' ', h('small', '', `من ${planTotal} ساعة (${completion}%)`)),
                             h('span', 'stab-hero-state ok', '✅ ساعات منجزة')),
                         passBar,
-                        h('div', 'stab-hero-cap', 'موادك "ناجح" لا تُحتسب بالمعدل — أدخل مواداً مقيّمة بعلامات لتفعيل تحليل الاستقرار'))));
+                        h('div', 'stab-hero-cap', 'المواد المسجّلة بنتيجة «ناجح» لا تُحتسب في المعدل — أدخل مواداً لها علامات لتفعيل تحليل الاستقرار'))));
             }
 
             if (hasGpa) {
                 const dMax = ((4 - G) * remainPlan) / planTotal;
                 const stable = dMax <= CONFIG.STABLE_DELTA;
 
-                // صف نقطة التعادل الذي يعرض المعدل المطلوب لرفع التراكمي
-                const breakEvenRow = row('', span('', 'يجب الحصول على معدل'), counter(G, { cls: 'tone-primary' }), span('', 'فصلياً لاستقرار معدلك'));
-
                 if (stable) {
-                    parts.push(item('icon-clock', 'متى يستقر معدلي؟',
-                        row('effect-row--ok', span('', '✅ معدلك مستقر الآن فعلاً'), span('tone-primary', `سقف تحسنه ≤ ${CONFIG.STABLE_DELTA.toFixed(2)}`)),
-                        breakEvenRow
+                    parts.push(item('icon-clock', 'متى يستقر معدلك؟',
+                        row('effect-row--ok', span('', '✅ معدلك مستقر الآن فعلاً'), span('tone-primary', `سقف تحسّنه ≤ ${CONFIG.STABLE_DELTA.toFixed(2)}`))
                     ));
                 } else {
                     const stableAt = Math.ceil(planTotal * (1 - CONFIG.STABLE_DELTA / (4 - G)));
                     const remainStable = Math.max(0, stableAt - H);
                     const semesters = Math.ceil(remainStable / CONFIG.SEMESTER_HOURS);
-                    const semText = semesters > 0 ? ` (~${semesters} ${semesters === 1 ? 'فصل' : 'فصول'})` : '';
-                    parts.push(item('icon-clock', 'متى يستقر معدلك ؟',
+                    const semText = semesters > 0 ? ` (~${countPhrase(semesters, SEMESTER_FORMS)})` : '';
+                    parts.push(item('icon-clock', 'متى يستقر معدلك؟',
                         row('', span('', 'يستقر عند'), span('', counter(stableAt, { float: false }), ' ساعة محتسبة')),
-                        row('', span('', 'على بعد'), span('', counter(remainStable, { float: false }), ` ساعة إضافية${semText}`)),
-                        breakEvenRow
+                        row('', span('', 'على بعد'), span('', counter(remainStable, { float: false }), ` ساعة إضافية${semText}`))
                     ));
                 }
             }
@@ -846,7 +861,7 @@
                 : ['light', '🪶 تأثير بسيط'];
             parts.push(item('icon-history', 'أثر ما أدخلته الآن',
                 row(`effect-row--${tone}`,
-                    span('', 'الفرق على تراكميك'),
+                    span('', 'التغيّر في معدلك التراكمي'),
                     counter(impact, { prefix: impact >= 0 ? '+' : '', cls: `d-val--lg ${impact >= 0 ? 'is-up' : 'is-down'}` }),
                     span(`tone-${tone}`, label))));
         }
@@ -857,10 +872,7 @@
             const firstV = hist[0], lastV = hist[n - 1];
             const rate = (lastV - firstV) / (n - 1);
             const maxV = Math.max(...hist), minV = Math.min(...hist);
-            const labelFor = (i) => {
-                const d = n - i;
-                return d === 1 ? 'الفصل الماضي' : d === 2 ? 'منذ فصلين' : `منذ ${d} فصول`;
-            };
+            const labelFor = (i) => semesterLabel(n - i).join(' ');
 
             const recentHist = hist.slice(-3);
             const swing = Math.max(...recentHist) - Math.min(...recentHist);
@@ -870,24 +882,25 @@
                 : ['strong', 'أداء متقلب'];
 
             const rows = [
-                row('', span('', 'متوسط تغيّرك/فصل'), counter(rate, { prefix: rate >= 0 ? '+' : '', cls: rate >= 0 ? 'is-up' : 'is-down' })),
+                row('', span('', 'متوسط التغيّر لكل فصل'), counter(rate, { prefix: rate >= 0 ? '+' : '', cls: rate >= 0 ? 'is-up' : 'is-down' })),
                 row('', span('', `أعلى معدل (${labelFor(hist.indexOf(maxV))})`), span('', maxV.toFixed(2))),
                 row('', span('', `أدنى معدل (${labelFor(hist.indexOf(minV))})`), span('', minV.toFixed(2))),
-                row(`effect-row--${tone}`, span('', 'مدى التذبذب (آخر 3 فصول)'), span(`tone-${tone}`, `${swing.toFixed(2)} · ${toneLabel}`))
+                row(`effect-row--${tone}`, span('', 'مدى عدم الاستقرار (آخر 3 فصول)'), span(`tone-${tone}`, `${swing.toFixed(2)} · ${toneLabel}`))
             ];
 
-            parts.push(item('icon-cap', `تحليل آدائك عبر ${n} ${pluralize(n, ['فصل', 'فصلين', 'فصول', 'فصل'])}`, ...rows));
+            parts.push(item('icon-cap', `تحليل أدائك عبر ${countPhrase(n, SEMESTER_FORMS)}`, ...rows));
         }
 
-        // محاكاة الساعات الديناميكية المضافة جديداً
+        // محاكاة الساعات الديناميكية
         if (hasGpa) {
             const calcEff = (g, hrs) => (hrs * (g - G)) / (H + hrs);
-            
+
             const hrsSelect = h('select', 'sim-select');
             [1, 2, 3, 4, 5, 6].forEach(val => {
-                hrsSelect.append(new Option(`${val} ${val <= 2 ? 'ساعة' : 'ساعات'}`, val));
+                const text = val === 1 ? 'ساعة' : val === 2 ? 'ساعتان' : `${val} ساعات`;
+                hrsSelect.append(new Option(text, val));
             });
-            hrsSelect.value = '3'; 
+            hrsSelect.value = '3';
 
             const bestVal = counter(calcEff(4, 3), { prefix: '+', cls: 'is-up' });
             const worstVal = counter(calcEff(1, 3), { cls: 'is-down' });
@@ -900,8 +913,8 @@
 
             parts.push(item('icon-book', 'محاكاة إضافة مادة جديدة',
                 row('', span('', 'اختر عدد الساعات:'), hrsSelect),
-                row('', span('grade-tag grade-tag--best', 'A كاملة'), span('', 'ستغيّر تراكميك'), bestVal),
-                row('', span('grade-tag grade-tag--worst', 'رسوب (-D)'), span('', 'ستغيّر تراكميك'), worstVal)
+                row('', span('grade-tag grade-tag--best', 'علامة A كاملة'), span('', 'تغيّر معدلك'), bestVal),
+                row('', span('grade-tag grade-tag--worst', 'رسوب (-D)'), span('', 'تغيّر معدلك'), worstVal)
             ));
         }
 
@@ -953,6 +966,7 @@
         DOM.historyList.appendChild(rowEl);
         updateHistoryNumbers();
         rowEl.querySelector('input').focus();
+        rowEl.scrollIntoView({ block: 'nearest' });
     }
 
     function removeHistoryRow(button) {
@@ -983,13 +997,28 @@
     // ==========================================
     // 10. الرسم البياني والاحتفال
     // ==========================================
+
+    // كم نقطة تتسع أفقياً في المنحنى الآن؟ (تتبع عرض الشاشة)
+    function getChartCapacity() {
+        const wrap = DOM.gpaChart && DOM.gpaChart.parentElement;
+        const maxPoints = CONFIG.MAX_TRACKED + 2; // الفصول المحفوظة + الحالي + الجديد
+        if (!wrap) return maxPoints;
+
+        const cs = getComputedStyle(wrap);
+        const inner = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        const fit = Math.floor((inner - CONFIG.CHART_AXIS_PX) / CONFIG.CHART_POINT_PX);
+        return Math.max(CONFIG.CHART_MIN_POINTS, Math.min(maxPoints, fit));
+    }
+
     function updateChart(oldGpa, finalGpa) {
         try {
+            const capacity = getChartCapacity();
+            AppState.chartCapacity = capacity;
+
             const h1 = parseFloat(DOM.hist1.value);
             const h2 = parseFloat(DOM.hist2.value);
 
-            let historyArray = Array.isArray(AppState.gpaHistory) ? [...AppState.gpaHistory] : [];
-            let mergedHistory = [...historyArray];
+            let mergedHistory = Array.isArray(AppState.gpaHistory) ? [...AppState.gpaHistory] : [];
 
             if (!isNaN(h2)) {
                 if (mergedHistory.length >= 1) mergedHistory[mergedHistory.length - 1] = h2;
@@ -1003,14 +1032,10 @@
 
             while (mergedHistory.length > CONFIG.MAX_TRACKED) mergedHistory.shift();
 
-            let timeline = [];
-            mergedHistory.forEach((g, i) => {
-                const d = mergedHistory.length - i;
-                timeline.push({ label: d === 1 ? 'الفصل الماضي' : d === 2 ? 'منذ فصلين' : `منذ ${d} فصول`, val: g });
-            });
+            const timeline = mergedHistory.map((g, i) => ({ label: semesterLabel(mergedHistory.length - i), val: g }));
 
-            if (oldGpa > 0 && !isNaN(oldGpa)) timeline.push({ label: 'المعدل الحالي', val: oldGpa });
-            if (!isNaN(finalGpa)) timeline.push({ label: 'المعدل الجديد', val: finalGpa });
+            if (oldGpa > 0 && !isNaN(oldGpa)) timeline.push({ label: LABEL_CURRENT, val: oldGpa });
+            if (!isNaN(finalGpa)) timeline.push({ label: LABEL_NEW, val: finalGpa });
 
             const labels = [];
             const data = [];
@@ -1024,6 +1049,12 @@
                 }
             });
 
+            // عرض الأحدث فقط بما يتسع أفقياً
+            if (data.length > capacity) {
+                labels.splice(0, labels.length - capacity);
+                data.splice(0, data.length - capacity);
+            }
+
             const signature = JSON.stringify({ labels, data });
             if (AppState.lastChartDataString === signature) return;
             AppState.lastChartDataString = signature;
@@ -1033,12 +1064,26 @@
             initChart(labels, data, yMin, yMax);
 
         } catch (error) {
-            console.error("تم احتواء خطأ في رسم المنحنى:", error);
+            console.error('تم احتواء خطأ في رسم المنحنى:', error);
         }
     }
 
+    // إعادة رسم المنحنى عند تغيّر عرضه، فقط إذا تغيّر عدد النقاط المتسعة
+    function watchChartSize() {
+        const wrap = DOM.gpaChart && DOM.gpaChart.parentElement;
+        if (!wrap || typeof ResizeObserver === 'undefined') return;
+
+        const refresh = debounce(() => {
+            const f = AppState.lastFull;
+            if (!f || getChartCapacity() === AppState.chartCapacity) return;
+            updateChart(f.oldGpa, f.finalGpa);
+        }, 120);
+
+        new ResizeObserver(refresh).observe(wrap);
+    }
+
     function initChart(labels, data, yMin, yMax) {
-        const canvas = document.getElementById('gpaChart');
+        const canvas = DOM.gpaChart;
         if (!canvas || typeof Chart === 'undefined') return;
 
         if (AppState.chartInstance) {
@@ -1068,10 +1113,21 @@
             },
             options: {
                 responsive: true, maintainAspectRatio: false, animation: { duration: 300, easing: 'easeOutQuart' },
-                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ' المعدل: ' + c.parsed.y } } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => {
+                                const l = items[0].chart.data.labels[items[0].dataIndex];
+                                return Array.isArray(l) ? l.join(' ') : l;
+                            },
+                            label: (c) => ' المعدل: ' + c.parsed.y.toFixed(2)
+                        }
+                    }
+                },
                 scales: {
                     y: { min: yMin, max: yMax, grid: { color: 'rgba(255, 255, 255, 0.1)' }, ticks: { color: 'rgba(255, 255, 255, 0.8)', font: { size: 14 } } },
-                    x: { grid: { display: false }, ticks: { color: 'rgba(255, 255, 255, 0.9)', font: { family: 'Tajawal', size: 13 } } }
+                    x: { grid: { display: false }, ticks: { color: 'rgba(255, 255, 255, 0.9)', font: { family: 'Tajawal', size: 13 }, autoSkip: false, maxRotation: 0, minRotation: 0 } }
                 }
             }
         });
@@ -1142,7 +1198,7 @@
         DOM.addCourseBtn.addEventListener('click', addCourse);
         DOM.nextSemesterBtn.addEventListener('click', moveToNextSemester);
         DOM.undoBtn.addEventListener('click', undoDelete);
-        
+
         DOM.detailsBtn.addEventListener('click', () => {
             buildDetailsContent();
             openModal(DOM.detailsModal);
@@ -1171,13 +1227,20 @@
             if (e.target.matches('[data-gpa]')) formatGpaInput(e);
         });
 
-        DOM.historyModal.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.target.matches('input')) saveHistoryModal();
-        });
-
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') { closeModal(DOM.detailsModal); closeModal(DOM.historyModal); }
         });
+
+        // Enter = حفظ عند فتح نافذة المعدلات السابقة (مرحلة الالتقاط تضمن وصول الحدث مهما كان التركيز)
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' || e.isComposing) return;
+            const modal = DOM.historyModal;
+            if (modal.hidden || modal.classList.contains('closing')) return;
+            const btn = e.target.closest && e.target.closest('button');
+            if (btn && modal.contains(btn)) return; // أزرار النافذة تعمل بسلوكها الأصلي
+            e.preventDefault();
+            saveHistoryModal();
+        }, true);
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -1189,6 +1252,7 @@
 
         bindEvents();
         loadData();
+        watchChartSize();
 
         clearInterval(AppState.timeUpdateInterval);
         AppState.timeUpdateInterval = setInterval(updateSaveIndicator, CONFIG.SAVE_REFRESH_MS);
