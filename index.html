@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>حساب المعدل التراكمي | جامعة البلقاء التطبيقية</title>
+    <meta name="description" content="احسب معدلك التراكمي في جامعة البلقاء التطبيقية، وخطّط للتخرج وتتبّع تطوّر معدلك فصلاً بفصل.">
+    <meta name="theme-color" content="#006838">
+    <link rel="manifest" href="manifest.webmanifest">
 
     <!-- تسريع جلب الملفات الخارجية -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,6 +14,13 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="https://fonts.googleapis.com">
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+
+    <!--Meta-->
+    <meta property="og:title" content="حساب المعدل التراكمي | جامعة البلقاء التطبيقية">
+    <meta property="og:description" content="احسب معدلك التراكمي في جامعة البلقاء التطبيقية، وخطّط للتخرج وتتبّع تطوّر معدلك فصلاً بفصل.">
+    <meta property="og:image" content="https://www.bau.edu.jo/content/Logo/baulogo.png">
+    <meta property="og:type" content="website">
+
 
     <!-- favicon -->
     <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png">
@@ -25,9 +35,8 @@
     <link rel="stylesheet" href="css/style.css">
 
     <!-- السكربتات -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js" defer></script>
     <script src="js/script.js" defer></script>
-    <base target="_blank">
 </head>
 <body>
     <!-- مكتبة الأيقونات المدمجة -->
@@ -52,7 +61,7 @@
         <!-- ============ قسم الإدخال ============ -->
         <div class="input-section">
             <div class="header">
-                <img src="https://www.bau.edu.jo/content/Logo/baulogo.png" alt="شعار جامعة البلقاء" width="80" height="80" loading="lazy">
+                <img src="https://www.bau.edu.jo/content/Logo/baulogo.png" alt="شعار جامعة البلقاء" width="80" height="80">
                 <h1>حساب المعدل التراكمي<span>جامعة البلقاء التطبيقية</span></h1>
             </div>
 
@@ -86,7 +95,7 @@
             <div class="grid-2">
                 <div class="form-group">
                     <label for="planTotal">إجمالي ساعات التخصص</label>
-                    <input type="number" id="planTotal" min="132" max="256" data-max="256">
+                    <input type="number" id="planTotal" min="1" max="256" data-max="256">
                 </div>
                 <div class="form-group">
                     <label for="planTarget">المعدل المستهدف</label>
@@ -99,7 +108,7 @@
                     <span>نسبة إنجاز الخطة</span>
                     <span id="progressPercent">0%</span>
                 </div>
-                <div class="progress-track">
+                <div class="progress-track" id="progressTrack" role="progressbar" aria-label="نسبة إنجاز الخطة" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
                 <div class="progress-note-row">
@@ -112,7 +121,7 @@
                 <span class="title-with-icon">
                     <svg class="icon"><use href="#icon-book"/></svg> مواد الفصل الحالي
                 </span>
-                <div id="semesterHoursBadge" class="semester-hours-badge">ساعات الفصل: 0</div>
+                <div id="semesterHoursBadge" class="semester-hours-badge" data-type="">ساعات الفصل: 0</div>
             </div>
             <div class="course-list" id="coursesContainer"></div>
 
@@ -154,11 +163,11 @@
     </div>
 
     <!-- نافذة تفاصيل استقرار المعدل -->
-    <div id="detailsModal" class="bau-modal" role="dialog" aria-modal="true" hidden>
+    <div id="detailsModal" class="bau-modal" role="dialog" aria-modal="true" aria-labelledby="detailsTitle" hidden>
         <div class="bau-modal-backdrop" id="detailsBackdrop"></div>
-        <div class="bau-modal-card">
+        <div class="bau-modal-card" tabindex="-1">
             <div class="bau-modal-header">
-                <h3>📊 تفاصيل المعدل</h3>
+                <h3 id="detailsTitle">📊 تفاصيل المعدل</h3>
                 <button id="detailsCloseBtn" class="bau-modal-close" type="button" aria-label="إغلاق">✕</button>
             </div>
             <div id="detailsBody" class="bau-modal-body"></div>
@@ -166,11 +175,11 @@
     </div>
 
     <!-- نافذة إدارة فصول التتبع -->
-    <div id="historyModal" class="bau-modal" role="dialog" aria-modal="true" hidden>
+    <div id="historyModal" class="bau-modal" role="dialog" aria-modal="true" aria-labelledby="historyTitle" hidden>
         <div class="bau-modal-backdrop" id="historyBackdrop"></div>
-        <div class="bau-modal-card bau-modal-card--history">
+        <div class="bau-modal-card bau-modal-card--history" tabindex="-1">
             <div class="bau-modal-header">
-                <h3>📈 المعدلات السابقة</h3>
+                <h3 id="historyTitle">📈 المعدلات السابقة</h3>
                 <button id="historyCloseBtn" class="bau-modal-close" type="button" aria-label="إغلاق">✕</button>
             </div>
             <div id="historyList" class="hist-list"></div>
@@ -192,7 +201,7 @@
     </div>
 
     <!-- إشعار التراجع -->
-    <div id="undoToast" class="undo-toast">
+    <div id="undoToast" class="undo-toast" role="status" aria-live="polite">
         <div class="toast-inner">
             <div class="countdown-circle">
                 <svg viewBox="0 0 36 36">
@@ -228,7 +237,7 @@
             <div class="course-options">
                 <label class="checkbox-label"><input type="checkbox" class="repeat-checkbox"> مادة معادة؟</label>
                 <div class="old-grade-wrapper">
-                    <label class="old-grade-label">العلامة السابقة:</label>
+                    <span class="old-grade-label">العلامة السابقة:</span>
                     <select class="old-grade" aria-label="العلامة السابقة">
                         <option value="2.50">(C)</option>
                         <option value="2.25">(-C)</option>
@@ -258,5 +267,8 @@
         <div data-tpl="empty-no-plan" class="detail-empty detail-empty--compact">أدخل <b>إجمالي ساعات التخصص</b> في «مخطط التخرج»<br>لتفعيل معادلة الاستقرار الكاملة</div>
         <div data-tpl="rule" class="detail-rule">📜 <b>المعادلة:</b> سقف التحسّن = (4.00 − معدلك) × الساعات المتبقية ÷ ساعات التخصص. نعتبر المعدل <b>شبه مستقر</b> عندما يصبح السقف ≤ <span class="rule-delta"></span>. ينكمش السقف تلقائياً كلما اقتربت من إتمام الخطة، وتعمل المعادلة مع أي عدد من ساعات التخصص (72، 132، 162، 256…).</div>
     </template>
+    <footer class="site-footer">
+        <span><span id="copyYear"></span> © Eng-Najem Haddadin</span>
+</footer>
 </body>
 </html>
