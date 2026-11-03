@@ -1,0 +1,16 @@
+{
+  "name": "حاسبة المعدل التراكمي — جامعة البلقاء التطبيقية",
+  "short_name": "حاسبة المعدل",
+  "description": "احسب معدلك التراكمي وخطّط للتخرج وتتبّع تطوّر معدلك فصلاً بفصل.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#006838",
+  "theme_color": "#006838",
+  "icons": [
+    { "src": "favicon/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "favicon/favicon-32x32.png", "sizes": "32x32", "type": "image/png" }
+  ]
+}
