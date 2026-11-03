@@ -23,7 +23,9 @@
         SEMESTER_HOURS: 15,
         CHART_POINT_PX: 56,       // أقل عرض لكل نقطة في المنحنى ليبقى مرتباً ومقروءاً
         CHART_AXIS_PX: 48,        // عرض محور Y والحواشي المحجوزة داخل المنحنى
-        CHART_MIN_POINTS: 3       // أقل عدد نقاط يُعرض مهما ضاقت الشاشة
+        CHART_MIN_POINTS: 3,      // تم إصلاح الفاصلة هنا
+        SUMMER_MAX_HOURS: 12,     // تم إضافة الحد الأعلى للساعات الصيفية الاعتيادية
+        SUMMER_MAX_HOURS_GRAD: 15 // الحد الأعلى إذا كان الطالب سيُنهي خطته في هذا الفصل
     };
 
     const Store = {
@@ -58,9 +60,15 @@
 
     const SEMESTER_FORMS = ['فصل', 'فصلين', 'فصول', 'فصلاً'];
 
+    const SEMESTER_TYPES = {
+        first: 'الفصل الأول',
+        second: 'الفصل الثاني',
+        summer: 'الفصل الصيفي'
+    };
+
     const SVG_NS = 'http://www.w3.org/2000/svg';
 
-    // تسميات المنحنى من سطرين (أضيق عرضاً، فتتسع نقاط أكثر على الشاشة)
+    // تسميات المنحنى من سطرين
     const LABEL_CURRENT = ['المعدل', 'الحالي'];
     const LABEL_NEW = ['المعدل', 'الجديد'];
     const DEFAULT_CHART_LABELS = [LABEL_CURRENT, LABEL_NEW];
@@ -81,6 +89,7 @@
         undoCountReset: null,
         warnTimeout: null,
         lastSaveTime: null,
+        saveFailed: false,
         timeUpdateInterval: null,
         lastChartDataString: '',
         currentTimestamp: null,
@@ -95,14 +104,14 @@
         const ids = [
             'gpaRating', 'oldGpa', 'oldHours', 'planTotal', 'planTarget', 'hist1', 'hist2',
             'coursesContainer', 'resultGpa', 'semesterGpaBadge', 'resultHours', 'semesterHoursBadge',
-            'appContainer', 'progressPercent', 'progressFill', 'progressNote',
+            'appContainer', 'progressPercent', 'progressFill', 'progressTrack', 'progressNote',
             'undoToast', 'undoMsg', 'undoTimerText', 'saveStatusText',
             'warnToast', 'warnMsg', 'detailsModal', 'detailsBody',
             'historyModal', 'historyList', 'gpaChart',
             'courseTemplate', 'noteTemplates', 'detailTemplates',
             'resetBtn', 'addCourseBtn', 'nextSemesterBtn', 'undoBtn', 'detailsBtn',
             'detailsCloseBtn', 'detailsBackdrop', 'historyBtn', 'historyCloseBtn',
-            'historyBackdrop', 'historyAddBtn', 'historySaveBtn'
+            'historyBackdrop', 'historyAddBtn', 'historySaveBtn', 'semesterTypeBadge'
         ];
         ids.forEach(id => { DOM[id] = document.getElementById(id); });
     }
@@ -130,12 +139,10 @@
         return (count >= 3 && count <= 10) ? few : many;
     }
 
-    // العدد مع معدوده بصيغة صحيحة: «فصل»، «فصلين»، «5 فصول»، «12 فصلاً»
     function countPhrase(count, forms) {
         return (count === 1 || count === 2) ? pluralize(count, forms) : `${count} ${pluralize(count, forms)}`;
     }
 
-    // تسمية الفصل السابق حسب بُعده عن الفصل الحالي (سطران لتضييق العرض في المنحنى)
     const semesterLabel = (d) =>
         d === 1 ? ['الفصل', 'الماضي'] : d === 2 ? ['منذ', 'فصلين'] : [`منذ ${d}`, pluralize(d, SEMESTER_FORMS)];
 
@@ -149,6 +156,7 @@
     const icon = (id) => {
         const svg = document.createElementNS(SVG_NS, 'svg');
         svg.setAttribute('class', 'icon');
+        svg.setAttribute('aria-hidden', 'true');
         const use = document.createElementNS(SVG_NS, 'use');
         use.setAttribute('href', `#${id}`);
         svg.append(use);
@@ -208,6 +216,11 @@
     // ==========================================
     function updateSaveIndicator() {
         if (!AppState.lastSaveTime || !DOM.saveStatusText) return;
+        DOM.saveStatusText.parentElement.classList.toggle('is-error', AppState.saveFailed);
+        if (AppState.saveFailed) {
+            DOM.saveStatusText.textContent = 'تعذّر الحفظ ⚠️';
+            return;
+        }
         const diff = Math.floor((Date.now() - AppState.lastSaveTime) / 1000);
         let text;
         if (diff < 10) text = 'الآن';
@@ -222,7 +235,7 @@
 
     function saveUserData(data) {
         const task = () => {
-            Store.set(CONFIG.STORAGE_KEY, JSON.stringify(data));
+            AppState.saveFailed = !Store.set(CONFIG.STORAGE_KEY, JSON.stringify(data));
             updateSaveIndicator();
         };
         if ('requestIdleCallback' in window) requestIdleCallback(task);
@@ -464,7 +477,9 @@
         const card = button.closest('.course-card');
         const cards = Array.from(DOM.coursesContainer.querySelectorAll('.course-card:not(.removing)'));
 
-        if (cards.length <= 1 || card.classList.contains('removing')) {
+        if (card.classList.contains('removing')) return;
+
+        if (cards.length <= 1) {
             alert('يجب إبقاء مادة واحدة على الأقل في الجدول.');
             return;
         }
@@ -617,6 +632,23 @@
         }
     }
 
+    function detectSemesterType(date, hours, isGraduating) {
+        if (!(hours > 0)) return null;
+
+        const month = date.getMonth() + 1;
+        if (month >= 10 || month === 1) return 'first';
+        if (month >= 2 && month <= 6) return 'second';
+
+        const cap = isGraduating ? CONFIG.SUMMER_MAX_HOURS_GRAD : CONFIG.SUMMER_MAX_HOURS;
+        return hours <= cap ? 'summer' : null;
+    }
+
+    function getSemesterType(registeredHours, finalTotalHours) {
+        const planTotal = parseFloat(DOM.planTotal.value) || 0;
+        const isGraduating = planTotal > 0 && finalTotalHours >= planTotal;
+        return detectSemesterType(new Date(), registeredHours, isGraduating);
+    }
+
     function calculateGPACore(isUserAction) {
         if (isUserAction) stampNow();
 
@@ -643,7 +675,8 @@
         AppState.lastComputed = { gpa: finalGpa, hours: finalTotalHours, semHours: newSemesterHours };
         AppState.lastFull = { oldGpa, oldHours, finalGpa, gpaHours, finalTotalHours, semesterGpa, newSemHours: newSemesterHours, courses: coursesInput };
 
-        renderResults(result);
+        const semesterType = getSemesterType(result.registeredSemesterHours, finalTotalHours);
+        renderResults({ ...result, semesterType });
         updateProgressSection(finalTotalHours, gpaHours, finalGpa);
         checkAcademicWarnings(finalTotalHours, gpaHours, finalGpa, isUserAction, newSemesterHours);
         updateChart(oldGpa, finalGpa);
@@ -654,11 +687,14 @@
     // ==========================================
     const readNumber = (el) => parseFloat(el.textContent.replace(/[^0-9.]/g, '')) || 0;
 
-    function renderResults({ finalGpa, semesterGpa, finalTotalHours, registeredSemesterHours }) {
+    function renderResults({ finalGpa, semesterGpa, finalTotalHours, registeredSemesterHours, semesterType }) {
         animateValue(DOM.resultGpa, readNumber(DOM.resultGpa), finalGpa, 250, true);
         animateValue(DOM.semesterGpaBadge, readNumber(DOM.semesterGpaBadge), semesterGpa, 250, true, '<svg class="icon"><use href="#icon-pie"/></svg> المعدل الفصلي: ');
         animateValue(DOM.resultHours, readNumber(DOM.resultHours), finalTotalHours, 250, false, '<svg class="icon"><use href="#icon-clock"/></svg> مجموع الساعات: ');
-        animateValue(DOM.semesterHoursBadge, readNumber(DOM.semesterHoursBadge), registeredSemesterHours, 250, false, 'ساعات الفصل: ');
+
+        DOM.semesterHoursBadge.dataset.type = semesterType || '';
+        const hoursLabel = `ساعات ${SEMESTER_TYPES[semesterType] || 'الفصل'}: `;
+        animateValue(DOM.semesterHoursBadge, readNumber(DOM.semesterHoursBadge), registeredSemesterHours, 250, false, hoursLabel);
     }
 
     const NoteAnim = { key: 'idle' };
@@ -687,6 +723,7 @@
 
     function setProgress(percentage) {
         DOM.progressFill.style.setProperty('--progress', `${percentage}%`);
+        DOM.progressTrack.setAttribute('aria-valuenow', String(percentage));
         const current = parseFloat(DOM.progressPercent.textContent) || 0;
         if (current !== percentage) animateValue(DOM.progressPercent, current, percentage, 600, false, '', '%');
     }
@@ -770,22 +807,59 @@
     // ==========================================
     // 9. نافذة التفاصيل والمحاكاة
     // ==========================================
+    const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
     function openModal(modal) {
+        modal._opener = document.activeElement;
         modal.classList.remove('closing');
         modal.hidden = false;
         void modal.offsetWidth;
         modal.classList.add('open');
+        modal.querySelector('.bau-modal-card').focus({ preventScroll: true });
     }
 
     function closeModal(modal) {
         if (modal.hidden || modal.classList.contains('closing')) return;
         modal.classList.remove('open');
         modal.classList.add('closing');
-        modal.querySelector('.bau-modal-card').addEventListener('animationend', (e) => {
-            if (e.target !== e.currentTarget) return;
+
+        const card = modal.querySelector('.bau-modal-card');
+        const finish = () => {
+            card.removeEventListener('animationend', onEnd);
+            clearTimeout(timer);
+            if (!modal.classList.contains('closing')) return;
             modal.hidden = true;
             modal.classList.remove('closing');
-        }, { once: true });
+            const opener = modal._opener;
+            if (opener && document.contains(opener)) opener.focus();
+        };
+        const onEnd = (e) => { if (e.target === card) finish(); };
+        card.addEventListener('animationend', onEnd);
+        const timer = setTimeout(finish, 400);
+    }
+
+    function trapFocus(e) {
+        const modal = [DOM.detailsModal, DOM.historyModal].find(m => !m.hidden && !m.classList.contains('closing'));
+        if (!modal) return;
+
+        const card = modal.querySelector('.bau-modal-card');
+        const items = Array.from(modal.querySelectorAll(FOCUSABLE)).filter(el => el.offsetParent !== null);
+        if (!items.length) { e.preventDefault(); return; }
+
+        const first = items[0];
+        const last = items[items.length - 1];
+        const active = document.activeElement;
+
+        if (!modal.contains(active)) {
+            e.preventDefault();
+            first.focus();
+        } else if (e.shiftKey && (active === first || active === card)) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && active === last) {
+            e.preventDefault();
+            first.focus();
+        }
     }
 
     function buildDetailsContent() {
@@ -891,7 +965,6 @@
             parts.push(item('icon-cap', `تحليل أدائك عبر ${countPhrase(n, SEMESTER_FORMS)}`, ...rows));
         }
 
-        // محاكاة الساعات الديناميكية
         if (hasGpa) {
             const calcEff = (g, hrs) => (hrs * (g - G)) / (H + hrs);
 
@@ -997,11 +1070,9 @@
     // ==========================================
     // 10. الرسم البياني والاحتفال
     // ==========================================
-
-    // كم نقطة تتسع أفقياً في المنحنى الآن؟ (تتبع عرض الشاشة)
     function getChartCapacity() {
         const wrap = DOM.gpaChart && DOM.gpaChart.parentElement;
-        const maxPoints = CONFIG.MAX_TRACKED + 2; // الفصول المحفوظة + الحالي + الجديد
+        const maxPoints = CONFIG.MAX_TRACKED + 2;
         if (!wrap) return maxPoints;
 
         const cs = getComputedStyle(wrap);
@@ -1049,7 +1120,6 @@
                 }
             });
 
-            // عرض الأحدث فقط بما يتسع أفقياً
             if (data.length > capacity) {
                 labels.splice(0, labels.length - capacity);
                 data.splice(0, data.length - capacity);
@@ -1068,7 +1138,6 @@
         }
     }
 
-    // إعادة رسم المنحنى عند تغيّر عرضه، فقط إذا تغيّر عدد النقاط المتسعة
     function watchChartSize() {
         const wrap = DOM.gpaChart && DOM.gpaChart.parentElement;
         if (!wrap || typeof ResizeObserver === 'undefined') return;
@@ -1140,7 +1209,11 @@
                 const script = document.createElement('script');
                 script.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
                 script.onload = resolve;
-                script.onerror = reject;
+                script.onerror = () => {
+                    AppState.confettiPromise = null;
+                    script.remove();
+                    reject();
+                };
                 document.head.appendChild(script);
             });
         }
@@ -1229,15 +1302,15 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') { closeModal(DOM.detailsModal); closeModal(DOM.historyModal); }
+            else if (e.key === 'Tab') trapFocus(e);
         });
 
-        // Enter = حفظ عند فتح نافذة المعدلات السابقة (مرحلة الالتقاط تضمن وصول الحدث مهما كان التركيز)
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter' || e.isComposing) return;
             const modal = DOM.historyModal;
             if (modal.hidden || modal.classList.contains('closing')) return;
             const btn = e.target.closest && e.target.closest('button');
-            if (btn && modal.contains(btn)) return; // أزرار النافذة تعمل بسلوكها الأصلي
+            if (btn && modal.contains(btn)) return;
             e.preventDefault();
             saveHistoryModal();
         }, true);
@@ -1258,4 +1331,12 @@
         AppState.timeUpdateInterval = setInterval(updateSaveIndicator, CONFIG.SAVE_REFRESH_MS);
     });
 
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        });
+    }
+
+    const y = document.getElementById('copyYear');
+    if (y) y.textContent = new Date().getFullYear();
 })();
