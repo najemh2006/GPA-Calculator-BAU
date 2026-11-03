@@ -1,5 +1,24 @@
+/* =========================================================
+   حاسبة المعدل التراكمي — جامعة البلقاء التطبيقية
+   فهرس الملف:
+     1. المتغيرات
+     2. الأساسيات (Reset)
+     3. هيكل الصفحة
+     4. قسم الإدخال
+     5. شريط تقدّم الخطة
+     6. بطاقات المواد
+     7. قسم النتائج
+     8. تتبّع التطوّر والمنحنى
+     9. التذييل وحقوق النشر
+    10. الإشعارات (تراجع / تحذير)
+    11. النوافذ المنبثقة
+    12. الحركات (Keyframes)
+    13. التجاوب (Responsive)
+========================================================= */
+
+
 /* =========================================
-   1. المتغيرات والإعدادات الأساسية
+   1. المتغيرات
 ========================================= */
 :root {
     --primary: #006838;
@@ -13,11 +32,16 @@
     --warn: #b45309;
     --border: #e2e8f0;
     --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+
     /* مدد العدّادات — يضبطها script.js */
     --undo-duration: 5s;
     --warn-duration: 5s;
 }
 
+
+/* =========================================
+   2. الأساسيات (Reset)
+========================================= */
 * {
     margin: 0;
     padding: 0;
@@ -41,6 +65,8 @@ input[type="number"] { -moz-appearance: textfield; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
+.svg-sprite { position: absolute; }
+
 .icon {
     width: 1em;
     height: 1em;
@@ -53,50 +79,83 @@ input[type="number"] { -moz-appearance: textfield; }
     stroke-linejoin: round;
 }
 
-.svg-sprite { position: absolute; }
+select {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    padding: 8px 8px 8px 2rem;
+    font-size: 0.95rem;
+    text-align: center;
+    background-color: #f8fafc;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: left 0.7rem center;
+    background-size: 1em;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    transition: 0.2s ease;
+}
+select:hover { border-color: var(--primary); }
+select:focus {
+    border-color: var(--primary);
+    background-color: #fff;
+    box-shadow: 0 0 0 2px rgba(0, 104, 56, 0.1);
+}
+
 
 /* =========================================
-   2. الهيكل والتخطيط
+   3. هيكل الصفحة
 ========================================= */
 body {
+    height: 100vh;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    overflow: hidden;
     background:
         linear-gradient(135deg, rgba(0, 104, 56, 0.95) 0%, rgba(26, 26, 26, 0.95) 100%),
         url('https://upload.wikimedia.org/wikipedia/commons/8/87/Balqa_Applied_University_Logo.png') center/cover fixed;
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem;
 }
 
 .app-container {
-    background-color: transparent;
     width: 100%;
     max-width: 1100px;
-    height: 90vh;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    grid-template-rows: minmax(0, 1fr);
+    background-color: transparent;
     border-radius: 24px;
     box-shadow: var(--shadow-lg);
     overflow: hidden;
-    display: grid;
-    grid-template-columns: 1fr 1.5fr;
     transform: translateZ(0);
-    transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
     contain: layout paint;
+    transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+
 /* =========================================
-   3. قسم الإدخال
+   4. قسم الإدخال
 ========================================= */
 .input-section {
-    background-color: var(--surface);
-    padding: 2rem;
-    border-left: 1px solid var(--border);
     height: 100%;
+    padding: 2rem;
+    background-color: var(--surface);
+    border-left: 1px solid var(--border);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
 
+/* ---- الترويسة ---- */
 .header {
     display: flex;
     align-items: center;
@@ -117,14 +176,15 @@ body {
     font-weight: 500;
 }
 
+/* ---- عناوين الأقسام ---- */
 .section-title {
-    font-size: 1rem;
-    color: var(--text-main);
-    margin-bottom: 1rem;
-    font-weight: 700;
     display: flex;
     align-items: center;
     gap: 8px;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-main);
 }
 .section-title .icon {
     color: var(--secondary);
@@ -132,6 +192,7 @@ body {
 }
 .section-title-row { justify-content: space-between; width: 100%; }
 .title-with-icon { display: flex; align-items: center; gap: 8px; }
+
 .header-actions { display: flex; align-items: center; gap: 15px; }
 
 .save-status {
@@ -139,24 +200,26 @@ body {
     align-items: center;
     gap: 4px;
     font-size: 0.75rem;
-    color: var(--primary);
     font-weight: 700;
+    color: var(--primary);
     opacity: 0.8;
 }
 .save-status .icon { width: 13px; height: 13px; }
+.save-status.is-error { color: var(--danger); opacity: 1; }
 
 .btn-icon-plain {
+    padding: 4px;
     background: transparent;
     border: none;
-    cursor: pointer;
     font-size: 1.1rem;
     line-height: 1;
-    padding: 4px;
+    cursor: pointer;
     transition: transform 0.2s, color 0.2s;
 }
 .btn-danger-icon { color: var(--danger); }
 .btn-danger-icon:hover { transform: scale(1.1); }
 
+/* ---- حقول الإدخال ---- */
 .grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -170,18 +233,17 @@ body {
     font-weight: 600;
     color: var(--text-muted);
 }
-
 .form-group input {
+    width: 100%;
     padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
     font-size: 1rem;
+    text-align: center;
     color: var(--text-main);
     background: #fff;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid var(--border);
+    border-radius: 10px;
     outline: none;
-    width: 100%;
-    text-align: center;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .form-group input:focus {
     border-color: var(--primary);
@@ -192,43 +254,91 @@ body {
     box-shadow: 0 0 0 3px rgba(218, 41, 28, 0.15);
 }
 
-/* ---- شريط تقدّم الخطة ---- */
-.progress-wrapper {
-    background: #f8fafc;
-    border: 1px solid var(--border);
+.semester-hours-badge {
+    padding: 4px 12px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary);
+    background: rgba(0, 104, 56, 0.08);
+    border: 1px solid rgba(0, 104, 56, 0.2);
     border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 1.5rem;
+}
+
+.semester-hours-badge[data-type="second"] {
+    color: #0369a1;
+    background: rgba(3, 105, 161, 0.08);
+    border-color: rgba(3, 105, 161, 0.25);
+}
+.semester-hours-badge[data-type="summer"] {
+    color: var(--warn);
+    background: rgba(243, 195, 0, 0.14);
+    border-color: rgba(180, 83, 9, 0.3);
+}
+
+.btn-add {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 2rem;
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: transparent;
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.btn-add:hover {
+    color: var(--primary);
+    background: rgba(0, 104, 56, 0.05);
+    border-color: var(--primary);
+}
+.btn-add:active { transform: scale(0.98); }
+
+
+/* =========================================
+   5. شريط تقدّم الخطة
+========================================= */
+.progress-wrapper {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    margin-bottom: 1.5rem;
+    padding: 12px 14px;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 12px;
 }
 
 .progress-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    font-weight: 700;
+    justify-content: space-between;
     font-size: 0.9rem;
+    font-weight: 700;
     color: var(--primary);
 }
 
 .progress-track {
+    position: relative;
     width: 100%;
     height: 8px;
     background: var(--border);
     border-radius: 10px;
     overflow: hidden;
-    position: relative;
 }
 
 .progress-fill {
-    height: 100%;
     width: var(--progress, 0%);
+    height: 100%;
     background: var(--secondary);
     border-radius: 10px;
-    transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
     box-shadow: 0 0 8px rgba(243, 195, 0, 0.4);
+    transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .progress-note-row { display: flex; align-items: center; gap: 8px; }
@@ -236,51 +346,44 @@ body {
 .progress-note {
     flex: 1;
     min-width: 0;
-    font-size: clamp(0.68rem, 3vw, 0.8rem); /* يصغّر الخط تدريجياً بدل أن يلتف النص */
+    font-size: clamp(0.68rem, 3vw, 0.8rem);   /* يصغّر الخط تدريجياً بدل أن يلتف النص */
     font-weight: 700;
-    color: var(--text-muted);
-    text-align: right;
     line-height: 1.2;
-    white-space: nowrap;                    /* سطر واحد دائماً */
+    text-align: right;
+    color: var(--text-muted);
+    white-space: nowrap;                       /* سطر واحد دائماً */
     overflow: hidden;
-    text-overflow: ellipsis;                /* شبكة أمان للشاشات الضيقة جداً */
+    text-overflow: ellipsis;                   /* شبكة أمان للشاشات الضيقة جداً */
 }
 
 .note-ok { color: var(--primary); }
 .note-bad { color: var(--danger); }
 
 .details-btn {
+    flex-shrink: 0;
+    padding: 3px 13px;
     font-size: 0.72rem;
     font-weight: 800;
+    white-space: nowrap;
     color: var(--primary);
     background: rgba(0, 104, 56, 0.07);
     border: 1px solid rgba(0, 104, 56, 0.28);
-    padding: 3px 13px;
     border-radius: 12px;
     cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
     transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 .details-btn:hover {
-    background: var(--primary);
     color: #fff;
+    background: var(--primary);
     transform: translateY(-1px);
     box-shadow: 0 3px 10px rgba(0, 104, 56, 0.25);
 }
 .details-btn:active { transform: translateY(0) scale(0.97); }
 
-.semester-hours-badge {
-    font-size: 0.85rem;
-    color: var(--primary);
-    background: rgba(0, 104, 56, 0.08);
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-weight: 700;
-    border: 1px solid rgba(0, 104, 56, 0.2);
-}
 
-/* ---- بطاقات المواد ---- */
+/* =========================================
+   6. بطاقات المواد
+========================================= */
 .course-list {
     display: flex;
     flex-direction: column;
@@ -289,17 +392,17 @@ body {
 }
 
 .course-card {
-    background: #ffffff;
-    padding: 12px 15px;
-    border-radius: 12px;
-    border: 2px solid var(--border);
-    margin-bottom: 10px;
-    animation: slideIn 0.3s ease-out;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
     max-height: 250px;
+    margin-bottom: 10px;
+    padding: 12px 15px;
+    background: #ffffff;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
     overflow: hidden;
     contain: layout paint;
     will-change: transform, opacity;
+    animation: slideIn 0.3s ease-out;
     transition: transform 0.2s, border-color 0.2s, background-color 0.2s;
 }
 .course-card:hover {
@@ -312,103 +415,78 @@ body {
     background-color: rgba(243, 195, 0, 0.04);
 }
 .course-card.removing {
+    max-height: 0;
+    margin: 0;
+    padding: 0;
+    border-width: 0;
     opacity: 0;
     transform: scale(0.9) translateY(-10px);
-    max-height: 0;
-    padding: 0;
-    margin: 0;
-    border-width: 0;
     transition: all 0.3s ease;
 }
 
-.course-main { display: flex; gap: 8px; align-items: center; }
-
-.btn-icon {
-    background: rgba(218, 41, 28, 0.1);
-    color: var(--danger);
-    border: none;
-    width: 38px;
-    height: 38px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: 0.2s;
-    flex-shrink: 0;
-}
-.btn-icon:hover { background: var(--danger); color: white; }
-.btn-icon:active { transform: scale(0.95); }
+.course-main { display: flex; align-items: center; gap: 8px; }
 
 .course-number-box {
-    background: rgba(243, 195, 0, 0.12);
-    color: var(--secondary);
-    border: 1px solid rgba(243, 195, 0, 0.3);
     width: 38px;
     height: 38px;
-    border-radius: 8px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 0.95rem;
     font-weight: 800;
-    font-size: 0.95rem;
-    flex-shrink: 0;
-}
-
-select {
-    flex: 1;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    background-color: #f8fafc;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: left 0.7rem center;
-    background-size: 1em;
-    padding: 8px 8px 8px 2rem;
-    font-size: 0.95rem;
-    text-align: center;
-    border: 1px solid var(--border);
+    color: var(--secondary);
+    background: rgba(243, 195, 0, 0.12);
+    border: 1px solid rgba(243, 195, 0, 0.3);
     border-radius: 8px;
-    outline: none;
-    transition: 0.2s ease;
-    cursor: pointer;
-    height: 40px;
-    min-width: 0;
-}
-select:hover { border-color: var(--primary); }
-select:focus {
-    border-color: var(--primary);
-    background-color: #fff;
-    box-shadow: 0 0 0 2px rgba(0, 104, 56, 0.1);
 }
 
+.btn-icon {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--danger);
+    background: rgba(218, 41, 28, 0.1);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.btn-icon:hover { color: #fff; background: var(--danger); }
+.btn-icon:active { transform: scale(0.95); }
+
+.select-pulse { animation: selectPulse 0.5s ease-out; }
+
+/* ---- خيارات المادة المعادة ---- */
 .course-options {
+    max-height: 160px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
     margin-top: 10px;
     padding-top: 8px;
     border-top: 1px dashed var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-    gap: 8px;
-    overflow: hidden;
-    max-height: 160px;
     opacity: 1;
+    overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .checkbox-label {
-    font-size: 0.75rem;
-    color: var(--text-main);
+    max-width: 200px;
     display: flex;
     align-items: center;
     gap: 6px;
-    cursor: pointer;
+    font-size: 0.75rem;
     font-weight: 600;
-    overflow: hidden;
-    max-width: 200px;
+    color: var(--text-main);
     white-space: nowrap;
+    overflow: hidden;
+    cursor: pointer;
 }
 .checkbox-label input {
     width: 14px;
@@ -418,101 +496,77 @@ select:focus {
 
 .old-grade-wrapper {
     max-height: 0;
-    opacity: 0;
-    overflow: hidden;
     display: flex;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 3px;
     margin-top: 0;
+    opacity: 0;
+    overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    flex-wrap: nowrap;
 }
 .old-grade-wrapper.show {
     flex: 1 1 100%;
     max-height: 100px;
-    opacity: 1;
+    gap: 8px;
     margin-top: 2px;
+    padding: 8px 10px;
+    opacity: 1;
     background: rgba(243, 195, 0, 0.06);
     border: 1px dashed rgba(243, 195, 0, 0.4);
     border-radius: 10px;
-    padding: 8px 10px;
-    gap: 8px;
 }
 .old-grade-wrapper.show .old-grade-label { color: var(--warn); font-weight: 700; }
 .old-grade-wrapper select {
-    padding-left: 5px;
-    background-image: none;
     flex: 1 1 auto;
     min-width: 0;
+    padding-left: 5px;
+    background-image: none;
 }
+
 .old-grade-label {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    white-space: nowrap;
     flex-shrink: 0;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    color: var(--text-muted);
 }
 
 .old-weight-pill {
+    flex-shrink: 0;
+    padding: 5px 11px;
     font-size: 0.66rem;
     font-weight: 800;
+    white-space: nowrap;
     color: var(--text-muted);
     background: #ffffff;
     border: 1px solid var(--border);
-    padding: 5px 11px;
     border-radius: 20px;
     cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
     transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
-.old-weight-pill:hover { border-color: rgba(180, 83, 9, 0.45); color: var(--warn); }
+.old-weight-pill:hover { color: var(--warn); border-color: rgba(180, 83, 9, 0.45); }
 .old-weight-pill:active { transform: scale(0.95); }
+.old-weight-pill:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .old-weight-pill.active {
     color: var(--warn);
     background: rgba(180, 83, 9, 0.1);
     border-color: rgba(180, 83, 9, 0.45);
     box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.08);
 }
-.old-weight-pill:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-.select-pulse { animation: selectPulse 0.5s ease-out; }
-
-.btn-add {
-    width: 100%;
-    padding: 12px;
-    background: transparent;
-    border: 2px dashed var(--border);
-    color: var(--text-muted);
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 2rem;
-    gap: 8px;
-}
-.btn-add:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: rgba(0, 104, 56, 0.05);
-}
-.btn-add:active { transform: scale(0.98); }
 
 /* =========================================
-   4. قسم النتائج
+   7. قسم النتائج
 ========================================= */
 .result-section {
-    background-color: var(--primary);
-    padding: 1.5rem;
-    color: white;
+    position: relative;
+    height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    height: 100%;
-    position: relative;
+    padding: 1.5rem;
+    color: #fff;
+    background-color: var(--primary);
     overflow: hidden;
 }
 .result-section::before {
@@ -524,65 +578,66 @@ select:focus {
 }
 
 .result-card,
+.stats-container,
 .history-container,
-.chart-wrapper,
-.stats-container { position: relative; z-index: 1; }
+.chart-wrapper { position: relative; z-index: 1; }
 
-.result-card { text-align: center; margin-bottom: 0; }
+.result-card { margin-bottom: 0; text-align: center; }
+
 .result-title {
-    font-size: 1.15rem;
-    color: rgba(255, 255, 255, 0.9);
     margin-bottom: 5px;
+    font-size: 1.15rem;
     font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .gpa-value {
+    margin-bottom: 8px;
     font-size: clamp(2.5rem, 5vw, 4rem);
     font-weight: 800;
     line-height: 1;
     color: var(--secondary);
     text-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    margin-bottom: 8px;
 }
 
 .stats-container {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
     gap: 15px;
-    flex-wrap: wrap;
 }
 
 .stat-badge {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: rgba(255, 255, 255, 0.1);
     padding: 8px 18px;
-    border-radius: 20px;
     font-size: 0.9rem;
     font-weight: 600;
-    backdrop-filter: blur(5px);
+    background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    backdrop-filter: blur(5px);
 }
 .stat-badge .icon { color: var(--secondary); }
 
 .btn-next-semester {
     width: 100%;
-    padding: 10px;
-    margin: 15px 0;
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
-    border-radius: 12px;
-    font-weight: 700;
-    font-size: 0.95rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
+    margin: 15px 0;
+    padding: 10px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    cursor: pointer;
     backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
 }
 .btn-next-semester:hover {
     background: rgba(255, 255, 255, 0.25);
@@ -591,13 +646,16 @@ select:focus {
 }
 .btn-next-semester:active { transform: translateY(0); }
 
-/* ---- تتبع التطور ---- */
+
+/* =========================================
+   8. تتبّع التطوّر والمنحنى
+========================================= */
 .history-container {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 12px 15px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
     margin-bottom: 10px;
+    padding: 12px 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
 }
 
 .history-title-row {
@@ -609,29 +667,23 @@ select:focus {
 }
 
 .history-title {
-    font-size: 0.95rem;
-    color: rgba(255, 255, 255, 0.9);
-    margin-bottom: 12px;
-    text-align: center;
-}
-.history-title-row .history-title {
-    margin-bottom: 0;
-    text-align: right;
     font-size: 0.85rem;
+    text-align: right;
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .history-btn {
+    flex-shrink: 0;
+    padding: 5px 14px;
     font-size: 0.74rem;
     font-weight: 800;
-    color: #ffffff;
+    white-space: nowrap;
+    color: #fff;
     background: var(--primary);
     border: 1px solid rgba(255, 255, 255, 0.25);
-    padding: 5px 14px;
     border-radius: 12px;
-    cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
     transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 .history-btn:hover {
@@ -647,13 +699,13 @@ select:focus {
     gap: 12px;
 }
 .history-grid input {
+    padding: 10px;
+    font-size: 1rem;
+    text-align: center;
+    color: #fff;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
-    padding: 10px;
     border-radius: 10px;
-    text-align: center;
-    font-size: 1rem;
     outline: none;
     transition: 0.3s;
 }
@@ -662,75 +714,100 @@ select:focus {
     border-color: var(--secondary);
 }
 .history-grid input::placeholder {
-    color: rgba(255, 255, 255, 0.5);
     font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.5);
 }
 
-/* ---- المنحنى ---- */
 .chart-wrapper {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 10px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    min-height: 150px;
     flex-grow: 1;
     display: flex;
     align-items: center;
-    min-height: 150px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
     transition: all 0.3s ease;
 }
 .chart-wrapper:hover { background: rgba(255, 255, 255, 0.08); }
 
 #gpaChart { width: 100% !important; height: 100% !important; }
 
+
 /* =========================================
-   5. إشعار التراجع (Undo Toast)
+   9. التذييل وحقوق النشر
 ========================================= */
+.site-footer {
+    width: 100%;
+    max-width: 1100px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.8);
+}
+.site-footer small {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+
+/* =========================================
+   10. الإشعارات (تراجع / تحذير)
+========================================= */
+
+/* ---- إشعار التراجع ---- */
 .undo-toast {
     position: fixed;
     bottom: -100px;
     left: 50%;
-    transform: translateX(-50%);
-    background: #ffffff;
-    color: var(--text-main);
-    padding: 10px 16px;
-    border-radius: 12px;
+    z-index: 9999;
     display: flex;
     align-items: center;
     gap: 15px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    z-index: 9999;
-    transition: bottom 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-    border: 1px solid var(--border);
+    padding: 10px 16px;
     font-size: 0.95rem;
     font-weight: 700;
+    color: var(--text-main);
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    transform: translateX(-50%);
+    transition: bottom 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .undo-toast.show { bottom: 30px; }
 
 .toast-inner { display: flex; align-items: center; gap: 10px; }
 
 .undo-toast button {
-    background: var(--secondary);
-    color: var(--text-main);
-    border: none;
-    padding: 6px 14px;
-    border-radius: 8px;
-    font-weight: 700;
-    cursor: pointer;
     display: flex;
     align-items: center;
     gap: 5px;
+    padding: 6px 14px;
+    font-weight: 700;
+    color: var(--text-main);
+    background: var(--secondary);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
     transition: transform 0.2s, background 0.2s;
 }
-.undo-toast button:hover { transform: scale(1.05); background: #facc15; }
+.undo-toast button:hover { background: #facc15; transform: scale(1.05); }
 
 .countdown-circle {
     position: relative;
     width: 28px;
     height: 28px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
 }
 .countdown-circle svg {
     position: absolute;
@@ -741,10 +818,10 @@ select:focus {
     transform: rotate(-90deg);
 }
 .countdown-circle span {
+    z-index: 1;
     font-size: 0.85rem;
     font-weight: 800;
     color: var(--danger);
-    z-index: 1;
 }
 
 .circle-bg { fill: none; stroke: #f1f5f9; stroke-width: 3; }
@@ -760,44 +837,42 @@ select:focus {
     animation: circleCountdown var(--undo-duration) linear forwards;
 }
 
-/* =========================================
-   6. رسالة التحذير العائمة (Warn Toast)
-========================================= */
+/* ---- رسالة التحذير العائمة ---- */
 .bau-warn-toast {
     position: fixed;
     bottom: 110px;
     left: 50%;
-    transform: translateX(-50%);
-    background: #ffffff;
-    border: 1px solid #fee2e2;
-    border-radius: 16px;
-    padding: 14px 18px 17px;
+    z-index: 9999;
+    max-width: min(440px, 92%);
     display: flex;
     align-items: center;
     gap: 12px;
-    max-width: min(440px, 92%);
-    overflow: hidden;
+    padding: 14px 18px 17px;
+    background: #ffffff;
+    border: 1px solid #fee2e2;
+    border-radius: 16px;
     box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22), 0 0 0 4px rgba(218, 41, 28, 0.05);
-    z-index: 9999;
+    transform: translateX(-50%);
     opacity: 0;
+    overflow: hidden;
     pointer-events: none;
 }
 .bau-warn-toast.show { animation: bauWarnIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.12) forwards; }
 .bau-warn-toast.hide {
-    transition: opacity 0.3s ease, transform 0.3s ease;
     opacity: 0 !important;
     transform: translateX(-50%) translateY(16px) !important;
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .warn-icon {
     width: 38px;
     height: 38px;
-    border-radius: 50%;
-    background: rgba(218, 41, 28, 0.1);
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+    background: rgba(218, 41, 28, 0.1);
+    border-radius: 50%;
 }
 .warn-icon svg {
     width: 20px;
@@ -808,15 +883,15 @@ select:focus {
     stroke-linecap: round;
     stroke-linejoin: round;
 }
-.warn-title { font-weight: 800; color: var(--danger); font-size: 0.9rem; }
-.warn-msg { font-weight: 600; color: #334155; font-size: 0.85rem; margin-top: 2px; }
+.warn-title { font-size: 0.9rem; font-weight: 800; color: var(--danger); }
+.warn-msg { margin-top: 2px; font-size: 0.85rem; font-weight: 600; color: #334155; }
 
 .warn-bar {
     position: absolute;
     bottom: 0;
     inset-inline-start: 0;
-    height: 3px;
     width: 100%;
+    height: 3px;
     background: rgba(218, 41, 28, 0.1);
 }
 .warn-bar > span {
@@ -829,9 +904,12 @@ select:focus {
     animation: bauWarnBar var(--warn-duration) linear forwards;
 }
 
+
 /* =========================================
-   7. النوافذ (التفاصيل + المعدلات السابقة)
+   11. النوافذ المنبثقة
 ========================================= */
+
+/* ---- الهيكل المشترك ---- */
 .bau-modal {
     position: fixed;
     inset: 0;
@@ -846,8 +924,8 @@ select:focus {
     position: absolute;
     inset: 0;
     background: rgba(8, 18, 13, 0.55);
-    backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
     opacity: 0;
     transition: opacity 0.3s ease;
 }
@@ -855,19 +933,18 @@ select:focus {
 
 .bau-modal-card {
     position: relative;
-    background: #ffffff;
-    border-radius: 20px;
     width: min(440px, 94vw);
     max-height: 86vh;
-    overflow-y: auto;
     padding: 20px 22px 22px;
+    background: #ffffff;
+    border-radius: 20px;
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 104, 56, 0.06);
     opacity: 0;
+    overflow-y: auto;
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
 .bau-modal-card::-webkit-scrollbar { display: none; }
-
 .bau-modal.open .bau-modal-card { animation: modalIn 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
 .bau-modal.closing .bau-modal-card { animation: modalOut 0.2s ease-in forwards; }
 
@@ -880,51 +957,31 @@ select:focus {
     padding-bottom: 12px;
     border-bottom: 2px solid rgba(0, 104, 56, 0.1);
 }
-.bau-modal-header h3 { color: var(--primary); font-size: 1rem; font-weight: 800; }
+.bau-modal-header h3 { font-size: 1rem; font-weight: 800; color: var(--primary); }
 
 .bau-modal-close {
     width: 32px;
     height: 32px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(100, 116, 139, 0.1);
-    color: var(--text-muted);
     font-size: 1rem;
     font-weight: 800;
-    cursor: pointer;
     line-height: 1;
+    color: var(--text-muted);
+    background: rgba(100, 116, 139, 0.1);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
     transition: background 0.2s, color 0.2s, transform 0.3s;
 }
-.bau-modal-close:hover { background: var(--danger); color: #fff; transform: rotate(90deg); }
+.bau-modal-close:hover { color: #fff; background: var(--danger); transform: rotate(90deg); }
 
 .bau-modal-body { display: flex; flex-direction: column; gap: 12px; }
 
 /* ---- نافذة التفاصيل ---- */
-.sim-select {
-    width: auto;
-    min-width: 90px;
-    height: 30px;
-    padding: 0 5px 0 25px;
-    font-size: 0.8rem;
-    font-weight: 800;
-    background-color: rgba(0, 104, 56, 0.06);
-    border: 1px solid rgba(0, 104, 56, 0.25);
-    color: var(--primary);
-    border-radius: 8px;
-    margin-right: 10px;
-    cursor: pointer;
-}
-.sim-select:hover,
-.sim-select:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(0, 104, 56, 0.1);
-}
-
 .detail-item {
+    padding: 12px 14px;
     background: #f8fafc;
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 12px 14px;
     opacity: 0;
     transform: translateY(12px);
     animation: detailIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
@@ -932,13 +989,13 @@ select:focus {
 }
 
 .detail-label {
-    font-size: 0.78rem;
-    font-weight: 800;
-    color: var(--text-main);
-    margin-bottom: 8px;
     display: flex;
     align-items: center;
     gap: 6px;
+    margin-bottom: 8px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: var(--text-main);
 }
 .detail-label .icon { color: var(--secondary); }
 
@@ -947,18 +1004,14 @@ select:focus {
 .stab-hero-num {
     font-size: 1.5rem;
     font-weight: 800;
-    color: var(--primary);
     font-variant-numeric: tabular-nums;
+    color: var(--primary);
 }
-.stab-hero-num small {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    font-weight: 700;
-}
+.stab-hero-num small { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); }
 .stab-hero-state {
+    padding: 3px 10px;
     font-size: 0.72rem;
     font-weight: 800;
-    padding: 3px 10px;
     border-radius: 11px;
 }
 .stab-hero-state.ok {
@@ -971,7 +1024,6 @@ select:focus {
     background: rgba(180, 83, 9, 0.08);
     border: 1px solid rgba(180, 83, 9, 0.3);
 }
-
 .stab-hero-bar {
     width: 100%;
     height: 9px;
@@ -981,13 +1033,12 @@ select:focus {
 }
 .stab-hero-bar > span {
     display: block;
-    height: 100%;
     width: var(--pct, 0%);
+    height: 100%;
     background: linear-gradient(90deg, var(--secondary), var(--primary));
     border-radius: 8px;
     animation: dBarGrow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
-
 .stab-hero-cap { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); }
 
 .effect-row {
@@ -995,17 +1046,17 @@ select:focus {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 7px 10px;
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 10px;
     margin-top: 6px;
+    padding: 7px 10px;
     font-size: 0.78rem;
     font-weight: 700;
     color: var(--text-main);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
 }
-.effect-row .grade-tag { font-weight: 800; min-width: 44px; }
-.effect-row .d-val { font-variant-numeric: tabular-nums; font-weight: 800; }
+.effect-row .grade-tag { min-width: 44px; font-weight: 800; }
+.effect-row .d-val { font-weight: 800; font-variant-numeric: tabular-nums; }
 .effect-row .d-val--lg { font-size: 0.95rem; }
 
 .effect-row--ok { background: rgba(0, 104, 56, 0.07); border-color: rgba(0, 104, 56, 0.3); }
@@ -1022,36 +1073,56 @@ select:focus {
 .grade-tag--best { color: var(--primary); }
 .grade-tag--worst { color: var(--danger); }
 
+.sim-select {
+    width: auto;
+    min-width: 90px;
+    height: 30px;
+    margin-right: 10px;
+    padding: 0 5px 0 25px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: var(--primary);
+    background-color: rgba(0, 104, 56, 0.06);
+    border: 1px solid rgba(0, 104, 56, 0.25);
+    border-radius: 8px;
+    cursor: pointer;
+}
+.sim-select:hover,
+.sim-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(0, 104, 56, 0.1);
+}
+
 .detail-rule {
+    padding: 10px 12px;
     font-size: 0.72rem;
     font-weight: 700;
-    color: var(--text-muted);
     line-height: 1.7;
-    padding: 10px 12px;
+    color: var(--text-muted);
     background: rgba(243, 195, 0, 0.07);
     border: 1px dashed rgba(243, 195, 0, 0.45);
     border-radius: 12px;
 }
 
 .detail-empty {
+    padding: 26px 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    line-height: 1.8;
     text-align: center;
     color: var(--text-muted);
-    font-weight: 700;
-    font-size: 0.85rem;
-    padding: 26px 10px;
-    line-height: 1.8;
 }
 .detail-empty--compact { padding: 14px 8px; }
 
 /* ---- نافذة المعدلات السابقة ---- */
 .hist-list {
+    max-height: 42vh;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 42vh;
+    padding: 4px 3px 8px;          /* مساحة لظل التركيز والحدود */
+    scroll-padding-block: 8px;     /* يبقي الصف المركَّز بعيداً عن الحافة عند التمرير */
     overflow-y: auto;
-    padding: 4px 3px 8px;        /* مساحة لظل التركيز والحدود */
-    scroll-padding-block: 8px;   /* يبقي الصف المركَّز بعيداً عن الحافة عند التمرير */
     scrollbar-width: none;
 }
 .hist-list::-webkit-scrollbar { display: none; }
@@ -1061,26 +1132,26 @@ select:focus {
 .hist-num {
     width: 30px;
     height: 30px;
-    border-radius: 8px;
-    background: rgba(243, 195, 0, 0.12);
-    color: var(--secondary);
-    border: 1px solid rgba(243, 195, 0, 0.3);
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 800;
     font-size: 0.85rem;
-    flex-shrink: 0;
+    font-weight: 800;
+    color: var(--secondary);
+    background: rgba(243, 195, 0, 0.12);
+    border: 1px solid rgba(243, 195, 0, 0.3);
+    border-radius: 8px;
 }
 
 .hist-input {
     flex: 1;
     min-width: 0;
     padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
     font-size: 0.95rem;
     text-align: center;
+    border: 1px solid var(--border);
+    border-radius: 8px;
     outline: none;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -1095,43 +1166,44 @@ select:focus {
 
 .btn-add-sm {
     flex: 1;
-    padding: 9px;
-    background: transparent;
-    border: 2px dashed var(--border);
-    color: var(--text-muted);
-    border-radius: 10px;
-    font-weight: 700;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
+    padding: 9px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: transparent;
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.2s;
 }
 .btn-add-sm:hover {
-    border-color: var(--primary);
     color: var(--primary);
     background: rgba(0, 104, 56, 0.05);
+    border-color: var(--primary);
 }
 .btn-add-sm:active { transform: scale(0.98); }
 
 .btn-primary-sm {
     padding: 9px 24px;
-    background: var(--primary);
+    font-size: 0.85rem;
+    font-weight: 800;
     color: #fff;
+    background: var(--primary);
     border: none;
     border-radius: 10px;
-    font-weight: 800;
-    font-size: 0.85rem;
     cursor: pointer;
     transition: background 0.2s, transform 0.2s;
 }
 .btn-primary-sm:hover { background: #00522c; }
 .btn-primary-sm:active { transform: scale(0.97); }
 
+
 /* =========================================
-   8. الحركات (Keyframes) والحالات
+   12. الحركات (Keyframes) والفئات المساعدة
 ========================================= */
 @keyframes slideIn {
     from { opacity: 0; transform: translateY(-10px); }
@@ -1181,54 +1253,64 @@ select:focus {
 .text-fade { animation: fadeSwap 0.3s ease-out; }
 .shake-animation { animation: shake 0.6s cubic-bezier(.36, .07, .19, .97) both !important; }
 
+
 /* =========================================
-   9. التجاوب (Responsive) — يبقى في آخر الملف
+   13. التجاوب (Responsive) — يبقى في آخر الملف
 ========================================= */
 @media (min-width: 1200px) {
-    .app-container { max-width: 1150px; }
+    .app-container,
+    .site-footer { max-width: 1150px; }
 }
 
 @media (max-width: 1024px) {
     body {
-        padding: 0;
         height: auto;
         min-height: 100vh;
+        padding: 0;
+        gap: 0;
+        align-items: stretch;
+        justify-content: flex-start;
         overflow-x: hidden;
         overflow-y: auto;
-        align-items: flex-start;
     }
     .app-container {
         display: flex;
         flex-direction: column;
+        flex: 1 0 auto;
         width: 100%;
+        max-width: none;
         height: auto;
-        min-height: 100vh;
-        border-radius: 0;
         margin: 0;
+        border-radius: 0;
         box-shadow: none;
         transform: none;
     }
     .input-section {
+        height: auto;
+        padding: 2.5rem 2rem;
         border-left: none;
         border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-        padding: 2.5rem 2rem;
-        height: auto;
         overflow-y: visible;
     }
     .result-section {
-        border-radius: 0;
-        padding: 3rem 2rem;
         height: auto;
+        padding: 3rem 2rem;
+        border-radius: 0;
         overflow-y: visible;
     }
     .chart-wrapper { min-height: 250px; }
+    .site-footer {
+        max-width: none;
+        padding: 1rem;
+        background: #1a1a1a;
+    }
 }
 
 @media (max-width: 768px) {
     .input-section,
     .result-section { padding: 2rem 1.5rem; }
-    .gpa-value { font-size: clamp(4rem, 10vw, 5rem); }
     .grid-2 { grid-template-columns: 1fr; gap: 15px; }
+    .gpa-value { font-size: clamp(4rem, 10vw, 5rem); }
     .undo-toast { width: 90%; justify-content: space-between; }
 }
 
@@ -1245,14 +1327,14 @@ select:focus {
         gap: 8px;
     }
     .course-number-box { font-size: 0.9rem; }
-    select { font-size: 0.85rem; padding: 0 5px 0 25px; height: 38px; }
+    select { height: 38px; padding: 0 5px 0 25px; font-size: 0.85rem; }
     .course-options { flex-direction: column; align-items: flex-start; gap: 10px; }
     .old-grade-wrapper { width: 100%; justify-content: space-between; }
     .old-grade-wrapper select { flex: 1; max-width: 65%; padding-left: 5px; }
-    .gpa-value { font-size: 3.5rem; margin-bottom: 15px; }
-    .stats-container { gap: 10px; flex-direction: column; align-items: stretch; }
-    .stat-badge { padding: 10px 12px; justify-content: center; }
-    .bau-warn-toast { bottom: 95px; padding: 11px 14px 14px; gap: 10px; }
+    .gpa-value { margin-bottom: 15px; font-size: 3.5rem; }
+    .stats-container { flex-direction: column; align-items: stretch; gap: 10px; }
+    .stat-badge { justify-content: center; padding: 10px 12px; }
+    .bau-warn-toast { bottom: 95px; gap: 10px; padding: 11px 14px 14px; }
     .warn-icon { width: 32px; height: 32px; }
 }
 
@@ -1265,7 +1347,7 @@ select:focus {
     .form-group input { padding: 9px 8px; font-size: 0.95rem; }
     .gpa-value { font-size: 2.9rem; }
     .result-title { font-size: 1rem; }
-    .btn-add { font-size: 0.9rem; padding: 10px; }
+    .btn-add { padding: 10px; font-size: 0.9rem; }
     .history-container { padding: 12px 14px; }
     .old-grade-wrapper { flex-wrap: wrap; }
     .old-weight-pill { padding: 4px 9px; }
@@ -1275,7 +1357,7 @@ select:focus {
     .input-section,
     .result-section { padding: 1.25rem 1.5rem; }
     .header { margin-bottom: 1rem; }
-    .gpa-value { font-size: 2.75rem; margin-bottom: 8px; }
+    .gpa-value { margin-bottom: 8px; font-size: 2.75rem; }
     .chart-wrapper { min-height: 160px; }
     .history-container { margin: 10px 0; padding: 10px 15px; }
 }
