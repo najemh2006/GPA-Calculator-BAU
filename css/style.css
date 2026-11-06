@@ -120,9 +120,7 @@ body {
     justify-content: center;
     gap: 12px;
     overflow: hidden;
-    background:
-        linear-gradient(135deg, rgba(0, 104, 56, 0.95) 0%, rgba(26, 26, 26, 0.95) 100%),
-        url('https://upload.wikimedia.org/wikipedia/commons/8/87/Balqa_Applied_University_Logo.png') center/cover fixed;
+    background: linear-gradient(135deg, rgba(0, 104, 56, 0.95) 0%, rgba(26, 26, 26, 0.95) 100%), center/cover fixed;
 }
 
 .app-container {
@@ -761,6 +759,14 @@ body {
    10. الإشعارات (تراجع / تحذير)
 ========================================= */
 
+.dialog-msg {
+    margin-bottom: 16px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.7;
+    color: var(--text-main);
+}
+
 /* ---- إشعار التراجع ---- */
 .undo-toast {
     position: fixed;
@@ -835,6 +841,26 @@ body {
 }
 .undo-toast.is-counting .circle-path {
     animation: circleCountdown var(--undo-duration) linear forwards;
+}
+
+/* تحديد الرقم الافتراضي */
+#undoTimerText::after {
+    content: "5";
+}
+
+/* تشغيل العداد عند إضافة كلاس is-counting */
+.undo-toast.is-counting #undoTimerText::after {
+    animation: textCountdown var(--undo-duration) step-end forwards;
+}
+
+/* رسم متحرك لتغيير الأرقام كل ثانية (بافتراض أن المدة 5 ثوانٍ) */
+@keyframes textCountdown {
+    0%   { content: "5"; }
+    20%  { content: "4"; }
+    40%  { content: "3"; }
+    60%  { content: "2"; }
+    80%  { content: "1"; }
+    100% { content: "0"; }
 }
 
 /* ---- رسالة التحذير العائمة ---- */
