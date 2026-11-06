@@ -6,7 +6,7 @@
 (() => {
 
     // ==========================================
-    // 1. الثوابت والبيانات
+    // الثوابت والبيانات
     // ==========================================
     const CONFIG = {
         STORAGE_KEY: 'bau_gpa_calculator_data',
@@ -18,14 +18,14 @@
         MIN_GPA: 2.00,
         MAX_COURSES: 12,
         DEFAULT_COURSES: 4,
-        MAX_TRACKED: 27,          // أقصى عدد فصول محفوظة (الترحيل التلقائي + نافذة التتبع)
+        MAX_TRACKED: 27,
         STABLE_DELTA: 0.10,
         SEMESTER_HOURS: 15,
-        CHART_POINT_PX: 56,       // أقل عرض لكل نقطة في المنحنى ليبقى مرتباً ومقروءاً
-        CHART_AXIS_PX: 48,        // عرض محور Y والحواشي المحجوزة داخل المنحنى
-        CHART_MIN_POINTS: 3,      // تم إصلاح الفاصلة هنا
-        SUMMER_MAX_HOURS: 12,     // تم إضافة الحد الأعلى للساعات الصيفية الاعتيادية
-        SUMMER_MAX_HOURS_GRAD: 15 // الحد الأعلى إذا كان الطالب سيُنهي خطته في هذا الفصل
+        CHART_POINT_PX: 56,
+        CHART_AXIS_PX: 48,
+        CHART_MIN_POINTS: 3,
+        SUMMER_MAX_HOURS: 12,
+        SUMMER_MAX_HOURS_GRAD: 15
     };
 
     const Store = {
@@ -51,7 +51,6 @@
         [2.00, 'مقبول 👍'], [-Infinity, 'ضعيف ⚠️']
     ];
 
-    // صيغ المعدود: [مفرد، مثنى، جمع (3–10)، تمييز مفرد منصوب (11 فأكثر)]
     const TIME_UNITS = [
         { secs: 86400, forms: ['يوم', 'يومين', 'أيام', 'يوماً'] },
         { secs: 3600, forms: ['ساعة', 'ساعتين', 'ساعات', 'ساعةً'] },
@@ -59,22 +58,14 @@
     ];
 
     const SEMESTER_FORMS = ['فصل', 'فصلين', 'فصول', 'فصلاً'];
-
-    const SEMESTER_TYPES = {
-        first: 'الفصل الأول',
-        second: 'الفصل الثاني',
-        summer: 'الفصل الصيفي'
-    };
-
     const SVG_NS = 'http://www.w3.org/2000/svg';
 
-    // تسميات المنحنى من سطرين
     const LABEL_CURRENT = ['المعدل', 'الحالي'];
     const LABEL_NEW = ['المعدل', 'الجديد'];
     const DEFAULT_CHART_LABELS = [LABEL_CURRENT, LABEL_NEW];
 
     // ==========================================
-    // 2. الحالة والعناصر
+    // الحالة والعناصر
     // ==========================================
     const AppState = {
         chartInstance: null,
@@ -85,7 +76,6 @@
         undoAction: null,
         gpaHistory: [],
         undoToastTimeout: null,
-        undoInterval: null,
         undoCountReset: null,
         warnTimeout: null,
         lastSaveTime: null,
@@ -111,13 +101,13 @@
             'courseTemplate', 'noteTemplates', 'detailTemplates',
             'resetBtn', 'addCourseBtn', 'nextSemesterBtn', 'undoBtn', 'detailsBtn',
             'detailsCloseBtn', 'detailsBackdrop', 'historyBtn', 'historyCloseBtn',
-            'historyBackdrop', 'historyAddBtn', 'historySaveBtn', 'semesterTypeBadge'
+            'historyBackdrop', 'historyAddBtn', 'historySaveBtn'
         ];
         ids.forEach(id => { DOM[id] = document.getElementById(id); });
     }
 
     // ==========================================
-    // 3. أدوات مساعدة
+    // أدوات مساعدة
     // ==========================================
     function debounce(fn, delay) {
         let id;
@@ -212,7 +202,7 @@
     }
 
     // ==========================================
-    // 4. التخزين ومؤشر الحفظ
+    // التخزين ومؤشر الحفظ
     // ==========================================
     function updateSaveIndicator() {
         if (!AppState.lastSaveTime || !DOM.saveStatusText) return;
@@ -302,8 +292,9 @@
         calculateGPA(false);
     }
 
-    function resetCalculator() {
-        if (!confirm('هل أنت متأكد من رغبتك في تفريغ جميع البيانات وحذف المواد الحالية؟')) return;
+    async function resetCalculator() {
+        const ok = await ask('هل أنت متأكد من رغبتك في تفريغ جميع البيانات وحذف المواد الحالية؟', 'تفريغ');
+        if (!ok) return;
         AppState.gpaHistory = [];
         [DOM.oldGpa, DOM.oldHours, DOM.planTotal, DOM.planTarget, DOM.hist1, DOM.hist2].forEach(i => { i.value = ''; });
         addDefaultCourses();
@@ -314,22 +305,23 @@
         hideUndoToast();
     }
 
-    function moveToNextSemester() {
+    async function moveToNextSemester() {
         const computed = AppState.lastComputed;
 
         if (!computed || computed.semHours === 0) {
-            alert('يرجى إدخال مواد وعلامات للفصل الحالي قبل الترحيل.');
+            await notify('يرجى إدخال مواد وعلامات للفصل الحالي قبل الترحيل.');
             return;
         }
 
         const curGpa = parseFloat(DOM.oldGpa.value) || 0;
         const curHours = parseInt(DOM.oldHours.value, 10) || 0;
         if (Math.abs(computed.gpa - curGpa) < 0.005 && computed.hours === curHours) {
-            alert('لا توجد نتائج جديدة للترحيل — أدخل مواد الفصل الحالي أولاً.');
+            await notify('لا توجد نتائج جديدة للترحيل — أدخل مواد الفصل الحالي أولاً.');
             return;
         }
 
-        if (!confirm('هل تريد ترحيل هذا المعدل ليكون معدلك الحالي، والبدء بفصل جديد؟')) return;
+        const ok = await ask('هل تريد ترحيل هذا المعدل ليكون معدلك الحالي، والبدء بفصل جديد؟', 'ترحيل');
+        if (!ok) return;
 
         const prevGpaVal = DOM.oldGpa.value;
         const prevHist2 = DOM.hist2.value;
@@ -374,7 +366,7 @@
     }
 
     // ==========================================
-    // 5. المواد الدراسية
+    // المواد الدراسية
     // ==========================================
     function fillGradeSelect(select, isZeroHours, selected = '') {
         const opts = isZeroHours
@@ -465,7 +457,7 @@
 
     function addCourse() {
         if (DOM.coursesContainer.querySelectorAll('.course-card').length >= CONFIG.MAX_COURSES) {
-            alert(`لا يمكن إضافة أكثر من ${CONFIG.MAX_COURSES} مادة في الفصل الواحد.`);
+            notify(`لا يمكن إضافة أكثر من ${CONFIG.MAX_COURSES} مادة في الفصل الواحد.`);
             return;
         }
         DOM.coursesContainer.appendChild(createCourseElement());
@@ -480,7 +472,7 @@
         if (card.classList.contains('removing')) return;
 
         if (cards.length <= 1) {
-            alert('يجب إبقاء مادة واحدة على الأقل في الجدول.');
+            notify('يجب إبقاء مادة واحدة على الأقل في الجدول.');
             return;
         }
 
@@ -523,7 +515,7 @@
     }
 
     // ==========================================
-    // 6. الإشعارات (تراجع / تحذير)
+    // الإشعارات (تراجع / تحذير)
     // ==========================================
     function showUndoToast(message, action) {
         const toast = DOM.undoToast;
@@ -536,14 +528,6 @@
         void toast.offsetWidth;
         toast.classList.add('is-counting');
 
-        let left = CONFIG.UNDO_MS / 1000;
-        DOM.undoTimerText.textContent = left;
-        clearInterval(AppState.undoInterval);
-        AppState.undoInterval = setInterval(() => {
-            left--;
-            if (left > 0) DOM.undoTimerText.textContent = left;
-        }, 1000);
-
         clearTimeout(AppState.undoToastTimeout);
         AppState.undoToastTimeout = setTimeout(hideUndoToast, CONFIG.UNDO_MS);
     }
@@ -551,7 +535,6 @@
     function hideUndoToast() {
         DOM.undoToast.classList.remove('show');
         AppState.undoAction = null;
-        clearInterval(AppState.undoInterval);
         clearTimeout(AppState.undoCountReset);
         AppState.undoCountReset = setTimeout(() => DOM.undoToast.classList.remove('is-counting'), 400);
     }
@@ -582,7 +565,68 @@
     }
 
     // ==========================================
-    // 7. الحساب النقي
+    // نافذة الحوار المخصصة (بديل alert / confirm)
+    // ==========================================
+    function showDialog({ title = 'تنبيه', message = '', confirmText = 'حسناً', cancelText = '' }) {
+        return new Promise((resolve) => {
+            const okBtn = h('button', 'btn-primary-sm', confirmText);
+            okBtn.type = 'button';
+
+            const actions = h('div', 'hist-footer', okBtn);
+            let cancelBtn = null;
+            if (cancelText) {
+                cancelBtn = h('button', 'btn-add-sm', cancelText);
+                cancelBtn.type = 'button';
+                actions.prepend(cancelBtn);
+            }
+
+            const card = h('div', 'bau-modal-card',
+                h('div', 'bau-modal-header', h('h3', '', title)),
+                h('p', 'dialog-msg', message),
+                actions);
+            card.tabIndex = -1;
+
+            const backdrop = h('div', 'bau-modal-backdrop');
+            const modal = h('div', 'bau-modal', backdrop, card);
+            modal.dataset.dialog = '1';
+            modal.setAttribute('role', 'alertdialog');
+            modal.setAttribute('aria-modal', 'true');
+            modal.hidden = true;
+            document.body.appendChild(modal);
+
+            let done = false;
+            const finish = (result) => {
+                if (done) return;
+                done = true;
+                document.removeEventListener('keydown', onKey, true);
+                closeModal(modal);
+                setTimeout(() => modal.remove(), 500);
+                resolve(result);
+            };
+            const onKey = (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    finish(false);
+                }
+            };
+
+            okBtn.addEventListener('click', () => finish(true));
+            if (cancelBtn) cancelBtn.addEventListener('click', () => finish(false));
+            backdrop.addEventListener('click', () => finish(false));
+            document.addEventListener('keydown', onKey, true);
+
+            openModal(modal);
+            (cancelBtn || okBtn).focus();
+        });
+    }
+
+    const notify = (message, title = 'تنبيه') => showDialog({ title, message });
+    const ask = (message, confirmText = 'تأكيد') =>
+        showDialog({ title: 'تأكيد', message, confirmText, cancelText: 'إلغاء' });
+
+    // ==========================================
+    // الحساب النقي
     // ==========================================
     function computeGPA(oldGpa, oldHours, courses) {
         let oldTotalPoints = oldGpa * oldHours;
@@ -632,23 +676,6 @@
         }
     }
 
-    function detectSemesterType(date, hours, isGraduating) {
-        if (!(hours > 0)) return null;
-
-        const month = date.getMonth() + 1;
-        if (month >= 10 || month === 1) return 'first';
-        if (month >= 2 && month <= 6) return 'second';
-
-        const cap = isGraduating ? CONFIG.SUMMER_MAX_HOURS_GRAD : CONFIG.SUMMER_MAX_HOURS;
-        return hours <= cap ? 'summer' : null;
-    }
-
-    function getSemesterType(registeredHours, finalTotalHours) {
-        const planTotal = parseFloat(DOM.planTotal.value) || 0;
-        const isGraduating = planTotal > 0 && finalTotalHours >= planTotal;
-        return detectSemesterType(new Date(), registeredHours, isGraduating);
-    }
-
     function calculateGPACore(isUserAction) {
         if (isUserAction) stampNow();
 
@@ -675,26 +702,24 @@
         AppState.lastComputed = { gpa: finalGpa, hours: finalTotalHours, semHours: newSemesterHours };
         AppState.lastFull = { oldGpa, oldHours, finalGpa, gpaHours, finalTotalHours, semesterGpa, newSemHours: newSemesterHours, courses: coursesInput };
 
-        const semesterType = getSemesterType(result.registeredSemesterHours, finalTotalHours);
-        renderResults({ ...result, semesterType });
+        renderResults(result);
         updateProgressSection(finalTotalHours, gpaHours, finalGpa);
         checkAcademicWarnings(finalTotalHours, gpaHours, finalGpa, isUserAction, newSemesterHours);
         updateChart(oldGpa, finalGpa);
     }
 
     // ==========================================
-    // 8. عرض النتائج والتقدم والتحذيرات
+    // عرض النتائج والتقدم والتحذيرات
     // ==========================================
     const readNumber = (el) => parseFloat(el.textContent.replace(/[^0-9.]/g, '')) || 0;
 
-    function renderResults({ finalGpa, semesterGpa, finalTotalHours, registeredSemesterHours, semesterType }) {
+    function renderResults({ finalGpa, semesterGpa, finalTotalHours, registeredSemesterHours }) {
         animateValue(DOM.resultGpa, readNumber(DOM.resultGpa), finalGpa, 250, true);
         animateValue(DOM.semesterGpaBadge, readNumber(DOM.semesterGpaBadge), semesterGpa, 250, true, '<svg class="icon"><use href="#icon-pie"/></svg> المعدل الفصلي: ');
         animateValue(DOM.resultHours, readNumber(DOM.resultHours), finalTotalHours, 250, false, '<svg class="icon"><use href="#icon-clock"/></svg> مجموع الساعات: ');
 
-        DOM.semesterHoursBadge.dataset.type = semesterType || '';
-        const hoursLabel = `ساعات ${SEMESTER_TYPES[semesterType] || 'الفصل'}: `;
-        animateValue(DOM.semesterHoursBadge, readNumber(DOM.semesterHoursBadge), registeredSemesterHours, 250, false, hoursLabel);
+        DOM.semesterHoursBadge.dataset.type = '';
+        animateValue(DOM.semesterHoursBadge, readNumber(DOM.semesterHoursBadge), registeredSemesterHours, 250, false, 'ساعات الفصل: ');
     }
 
     const NoteAnim = { key: 'idle' };
@@ -805,7 +830,7 @@
     }
 
     // ==========================================
-    // 9. نافذة التفاصيل والمحاكاة
+    // نافذة التفاصيل والمحاكاة
     // ==========================================
     const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -839,7 +864,9 @@
     }
 
     function trapFocus(e) {
-        const modal = [DOM.detailsModal, DOM.historyModal].find(m => !m.hidden && !m.classList.contains('closing'));
+        const modals = Array.from(document.querySelectorAll('.bau-modal'))
+            .filter(m => !m.hidden && !m.classList.contains('closing'));
+        const modal = modals[modals.length - 1];
         if (!modal) return;
 
         const card = modal.querySelector('.bau-modal-card');
@@ -1007,7 +1034,7 @@
     }
 
     // ==========================================
-    // 9ب. نافذة "إضافة جميع الفصول"
+    // نافذة "إضافة جميع الفصول"
     // ==========================================
     function createHistoryRow(value = '') {
         const input = h('input', 'hist-input');
@@ -1032,7 +1059,7 @@
 
     function addHistoryRow(value = '') {
         if (DOM.historyList.querySelectorAll('.hist-row').length >= CONFIG.MAX_TRACKED) {
-            alert(`لا يمكن إضافة أكثر من ${CONFIG.MAX_TRACKED} معدلاً في التتبع.`);
+            notify(`لا يمكن إضافة أكثر من ${CONFIG.MAX_TRACKED} معدلاً في التتبع.`);
             return;
         }
         const rowEl = createHistoryRow(value);
@@ -1068,7 +1095,7 @@
     }
 
     // ==========================================
-    // 10. الرسم البياني والاحتفال
+    // الرسم البياني والاحتفال
     // ==========================================
     function getChartCapacity() {
         const wrap = DOM.gpaChart && DOM.gpaChart.parentElement;
@@ -1236,7 +1263,7 @@
     }
 
     // ==========================================
-    // 11. الأحداث والتشغيل
+    // الأحداث والتشغيل
     // ==========================================
     const debouncedCalculateAndSave = debounce(() => calculateGPA(true), CONFIG.CALC_DEBOUNCE_MS);
 
@@ -1309,6 +1336,7 @@
             if (e.key !== 'Enter' || e.isComposing) return;
             const modal = DOM.historyModal;
             if (modal.hidden || modal.classList.contains('closing')) return;
+            if (document.querySelector('.bau-modal[data-dialog]')) return;
             const btn = e.target.closest && e.target.closest('button');
             if (btn && modal.contains(btn)) return;
             e.preventDefault();
