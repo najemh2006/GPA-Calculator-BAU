@@ -11,7 +11,6 @@
     <meta name="theme-color" content="#006838" />
     <link rel="manifest" href="manifest.webmanifest" />
 
-    <!-- تسريع جلب الملفات الخارجية -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
@@ -53,24 +52,29 @@
     />
     <link rel="icon" type="image/x-icon" href="favicon/favicon.ico" />
 
-    <!-- الخط -->
+    <!-- Font -->
     <link
       href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap"
       rel="stylesheet"
     />
 
-    <!-- التنسيق -->
+    <!-- Style -->
     <link rel="stylesheet" href="css/style.css" />
 
-    <!-- السكربتات -->
+    <!-- Scripts -->
     <script
       src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"
+      defer
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"
+      crossorigin="anonymous"
       defer
     ></script>
     <script src="js/script.js" defer></script>
   </head>
   <body>
-    <!-- مكتبة الأيقونات المدمجة -->
+    <!-- Icons-->
     <svg
       class="svg-sprite"
       width="0"
@@ -131,7 +135,7 @@
     </svg>
 
     <div class="app-container" id="appContainer">
-      <!-- ============ قسم الإدخال ============ -->
+      <!-- ============ Input section ============ -->
       <div class="input-section">
         <div class="header">
           <img
@@ -249,7 +253,7 @@
         </button>
       </div>
 
-      <!-- ============ قسم النتائج ============ -->
+      <!-- ============ Result section ============ -->
       <div class="result-section">
         <div class="result-card">
           <div class="result-title">المعدل التراكمي الجديد</div>
@@ -348,6 +352,7 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="historyTitle"
+      س
       hidden
     >
       <div class="bau-modal-backdrop" id="historyBackdrop"></div>
@@ -415,7 +420,7 @@
       </button>
     </div>
 
-    <!-- ============ القوالب ============ -->
+    <!-- ============ Templates ============ -->
     <template id="courseTemplate">
       <div class="course-card">
         <div class="course-main">
