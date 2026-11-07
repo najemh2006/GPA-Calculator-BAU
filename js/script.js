@@ -568,6 +568,7 @@
     // نافذة الحوار المخصصة (بديل alert / confirm)
     // ==========================================
     function showDialog({ title = 'تنبيه', message = '', confirmText = 'حسناً', cancelText = '' }) {
+        if (document.querySelector('.bau-modal[data-dialog]')) return Promise.resolve(false);
         return new Promise((resolve) => {
             const okBtn = h('button', 'btn-primary-sm', confirmText);
             okBtn.type = 'button';
